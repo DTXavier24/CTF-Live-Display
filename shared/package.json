@@ -1,0 +1,6 @@
+{
+  "name": "@iboh/shared",
+  "private": true,
+  "type": "module",
+  "types": "index.d.ts"
+}
