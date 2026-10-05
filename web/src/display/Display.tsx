@@ -1,7 +1,9 @@
 import type { DisplayState, Division, PerDivision, Solve } from '@iboh/shared';
-import { AnimatePresence, motion, useSpring, useTransform } from 'motion/react';
-import { useEffect, type ReactNode } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
+import type { ReactNode } from 'react';
 import { Boundary } from '../Boundary';
+import { CountUp } from '../CountUp';
+import { Featured, isFullscreen } from './Featured';
 import { Stage } from '../Stage';
 import { fmtClock, fmtDuration, useNow, useServerState } from '../server';
 
@@ -33,8 +35,29 @@ export function Display() {
           )}
         </motion.div>
       </AnimatePresence>
+      {state && <Overlay state={state} />}
       {state && delayed && <DelayedBadge />}
     </Stage>
+  );
+}
+
+/** Full-screen takeovers, and queue items over the pre-CTF page (which has no center panel). */
+function Overlay({ state }: { state: DisplayState }) {
+  const now = state.now;
+  const show = !!now && state.phase !== 'ended' && (isFullscreen(now) || state.phase === 'pre');
+  if (!show) return null;
+  return isFullscreen(now) ? (
+    <div className="absolute inset-0 z-20 bg-bg">
+      <Featured now={now} />
+    </div>
+  ) : (
+    <div className="absolute inset-0 z-20 flex items-center justify-center bg-bg/80">
+      <div className="hud relative h-[760px] w-[1280px] overflow-hidden border border-line bg-bg-2 p-10">
+        <div className="relative h-full">
+          <Featured now={now} />
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -98,9 +121,13 @@ function LiveView({ state, delayed }: { state: DisplayState; delayed: boolean })
         </Boundary>
         <Boundary name="center">
           <Panel title="Featured">
-            {/* Queue / loop items render here (phase 3). */}
-            <div className="flex h-full items-center justify-center">
-              <img src="/brand/logo_with_text.png" alt="" className="max-h-[260px] opacity-30" />
+            <div className="relative h-full">
+              {/* Idle (nothing queued, loop off or skipping): brand mark, never a blank panel. */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <img src="/brand/logo_with_text.png" alt="" className="max-h-[260px] opacity-30" />
+              </div>
+              <div className="absolute inset-0 bg-bg-2" style={{ opacity: state.now && !isFullscreen(state.now) ? 1 : 0 }} />
+              <Featured now={state.now && !isFullscreen(state.now) ? state.now : null} />
             </div>
           </Panel>
         </Boundary>
@@ -147,13 +174,6 @@ function Panel({ title, children }: { title: string; children: ReactNode }) {
       <div className="min-h-0 flex-1">{children}</div>
     </section>
   );
-}
-
-function CountUp({ value, decimals = 0 }: { value: number; decimals?: number }) {
-  const spring = useSpring(value, { stiffness: 60, damping: 18 });
-  const text = useTransform(spring, (v) => v.toFixed(decimals));
-  useEffect(() => spring.set(value), [spring, value]);
-  return <motion.span className="tabular-nums">{text}</motion.span>;
 }
 
 function StatsPanel({ state }: { state: DisplayState }) {

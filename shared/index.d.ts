@@ -70,8 +70,85 @@ export interface DisplayState {
   dataDelayed: boolean;
   serverTime: number;
   mock: boolean;
+  /** Current featured item (center panel, or full screen for takeovers). */
+  now: NowPlaying | null;
 }
 
 export interface ServerToClientEvents {
   state: (state: DisplayState) => void;
+}
+
+// ---------- Queue / loop / templates ----------
+
+export type Priority = 'normal' | 'high';
+
+export interface ScoreRow {
+  teamId: number;
+  name: string;
+  rank: number;
+  score: number;
+  solvedCount: number;
+}
+
+export interface Top10Board {
+  division: Division;
+  rows: ScoreRow[];
+  /** The board as last shown for this division, so rows can animate from there. */
+  prevRows: ScoreRow[] | null;
+  /** Previous rank of every team (not just the top 10), for ▲/▼ movement. */
+  prevRanks: Record<number, number> | null;
+}
+
+/** Display payload per template, built by the server at play time. */
+export interface TemplatePayloads {
+  'countdown-start': { target: number; label: string };
+  'countdown-end': { target: number; label: string };
+  announcement: { title: string; body: string };
+  top10: { boards: Top10Board[] };
+  unsolved: { categories: { category: string; challenges: string[] }[]; total: number };
+  'sponsor-video': { url: string };
+}
+export type TemplateId = keyof TemplatePayloads;
+
+export type NowPlaying = {
+  [K in TemplateId]: {
+    /** Unique per play, so the same loop entry twice still gets a fresh transition. */
+    id: string;
+    template: K;
+    payload: TemplatePayloads[K];
+    /** Null: plays until the display reports done (videos). */
+    durationMs: number | null;
+    status: 'loading' | 'playing';
+    startedAt: number | null;
+    source: 'queue' | 'loop';
+  };
+}[TemplateId];
+
+export interface QueueItem {
+  id: string;
+  template: TemplateId;
+  /** Admin-provided fields, validated by the template's schema. */
+  input: unknown;
+  priority: Priority;
+  durationMs?: number;
+  createdAt: number;
+}
+
+export interface LoopEntry {
+  template: TemplateId;
+  input?: unknown;
+  durationMs?: number;
+}
+
+export interface LoopConfig {
+  enabled: boolean;
+  entries: LoopEntry[];
+}
+
+export type ReportStatus = 'ready' | 'done' | 'error';
+
+export interface ClientToServerEvents {
+  report: (r: { id: string; status: ReportStatus; error?: string }) => void;
+  /** Hidden tabs don't animate, so they can't play items: only visible displays count as watching. */
+  visibility: (visible: boolean) => void;
 }

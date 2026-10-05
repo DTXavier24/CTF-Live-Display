@@ -7,7 +7,10 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react(), tailwindcss()],
     server: {
-      proxy: { '/socket.io': { target: `http://localhost:${env.PORT || 3000}`, ws: true } },
+      proxy: {
+        '/socket.io': { target: `http://localhost:${env.PORT || 3000}`, ws: true },
+        '/media': `http://localhost:${env.PORT || 3000}`,
+      },
     },
   };
 });

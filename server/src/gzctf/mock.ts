@@ -23,6 +23,9 @@ interface MockTeam {
   solved: Map<number, Solve>; // challengeId -> solve
 }
 
+/** Rarely solved, so "unsolved" (and later The Wall Falls) has something to show. */
+const HARD = new Set(['Format Fiesta', 'Padding Oracle', 'VM Escape']);
+
 const pick = <T>(xs: T[]) => xs[Math.floor(Math.random() * xs.length)]!;
 
 /** Roulette pick: chance proportional to weight. */
@@ -58,7 +61,7 @@ export function createMockSource(): GzctfSource {
     if (!candidates.length) return null;
     const team = weighted(candidates, (t) => t.skill);
     const open = challenges.filter((c) => !team.solved.has(c.id));
-    const chal = weighted(open, (c) => 1 / c.points ** 2);
+    const chal = weighted(open, (c) => (HARD.has(c.title) ? 0.002 : 1) / c.points ** 2);
     const solve: Solve = {
       id: `${team.id}-${chal.id}`,
       teamId: team.id,

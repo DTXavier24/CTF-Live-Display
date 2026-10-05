@@ -9,6 +9,7 @@ try {
 const env = z
   .object({
     PORT: z.coerce.number().int().default(3000),
+    ADMIN_PASSWORD: z.string().min(1).optional(),
     MOCK_GZCTF: z.string().default('0'),
     MOCK_START_OFFSET_MIN: z.coerce.number().default(30),
     MOCK_DURATION_MIN: z.coerce.number().positive().default(600),
@@ -38,6 +39,7 @@ if (!mock && env.GZCTF_INSECURE_TLS === '1') {
 
 export const config = {
   port: env.PORT,
+  adminPassword: env.ADMIN_PASSWORD,
   mock,
   gzctf: mock ? null : gzctfConfig(),
   mockStartOffsetMin: env.MOCK_START_OFFSET_MIN,

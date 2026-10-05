@@ -1,9 +1,10 @@
-import type { DisplayState, Division, Game, Phase, ServerToClientEvents, Solve } from '@iboh/shared';
+import type { ClientToServerEvents, DisplayState, Division, Game, NowPlaying, Phase, ServerToClientEvents, Solve } from '@iboh/shared';
 import type { FastifyBaseLogger } from 'fastify';
 import type { Server } from 'socket.io';
 import { config } from './config.js';
 import { kv } from './db.js';
 import type { GzctfSource } from './gzctf/source.js';
+import type { TemplateContext } from './templates.js';
 
 const FEED_SIZE = 10;
 const RATE_WINDOW_MS = 5 * 60_000;
@@ -14,7 +15,7 @@ export function phaseAt(game: Game | null, now: number): Phase {
   return now < game.end ? 'live' : 'ended';
 }
 
-export function startState(source: GzctfSource, io: Server<{}, ServerToClientEvents>, log: FastifyBaseLogger) {
+export function startState(source: GzctfSource, io: Server<ClientToServerEvents, ServerToClientEvents>, log: FastifyBaseLogger) {
   // Last-known data survives restarts: stale over blank.
   let game = kv.get<Game>('game') ?? null;
   let scoreboard = kv.get<DisplayState['scoreboard']>('scoreboard') ?? { entries: [], challenges: [] };
@@ -25,6 +26,7 @@ export function startState(source: GzctfSource, io: Server<{}, ServerToClientEve
   let recent: { time: number; division: Division }[] = [];
   let dataDelayed = true; // until the first successful fetch
   let lastPhase: Phase | null = null;
+  let getNow: () => NowPlaying | null = () => null;
 
   function snapshot(): DisplayState {
     const now = Date.now();
@@ -45,6 +47,7 @@ export function startState(source: GzctfSource, io: Server<{}, ServerToClientEve
       dataDelayed,
       serverTime: now,
       mock: config.mock,
+      now: getNow(),
     };
   }
 
@@ -106,4 +109,12 @@ export function startState(source: GzctfSource, io: Server<{}, ServerToClientEve
   }, 1000);
 
   io.on('connection', (socket) => socket.emit('state', snapshot()));
+
+  return {
+    push,
+    context: (): TemplateContext => ({ game, scoreboard, phase: phaseAt(game, Date.now()), now: Date.now() }),
+    setNowPlaying(fn: () => NowPlaying | null) {
+      getNow = fn;
+    },
+  };
 }

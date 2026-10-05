@@ -1,9 +1,18 @@
-import type { DisplayState, ServerToClientEvents } from '@iboh/shared';
+import type { ClientToServerEvents, DisplayState, ReportStatus, ServerToClientEvents } from '@iboh/shared';
 import { useEffect, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
 
 // One socket per page. Socket.IO reconnects forever with exponential backoff by default.
-const socket: Socket<ServerToClientEvents> = io();
+// Only the display drives the queue engine (and counts as someone watching).
+const isDisplay = location.pathname.startsWith('/display') || location.pathname === '/';
+const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io({
+  // A function, so every reconnect sends the current visibility.
+  auth: (cb) => cb({ role: isDisplay ? 'display' : 'viewer', visible: document.visibilityState === 'visible' }),
+});
+if (isDisplay) document.addEventListener('visibilitychange', () => socket.emit('visibility', document.visibilityState === 'visible'));
+
+/** Tell the engine how the current featured item is doing. */
+export const report = (id: string, status: ReportStatus, error?: string) => socket.emit('report', { id, status, error });
 
 let clockOffset = 0;
 let lastState: DisplayState | null = null;
