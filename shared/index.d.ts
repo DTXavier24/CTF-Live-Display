@@ -31,9 +31,12 @@ export interface ScoreEntry {
 export interface Scoreboard {
   entries: ScoreEntry[];
   challenges: Challenge[];
+  /** Full solve history. Server-only: stripped before broadcasting. */
+  solves: Solve[];
 }
 
 export interface Solve {
+  /** `${teamId}-${challengeId}`: the same solve from the hub and the scoreboard dedupes. */
   id: string;
   teamId: number;
   teamName: string;
@@ -59,7 +62,7 @@ export interface Stats {
 export interface DisplayState {
   phase: Phase;
   game: Game | null;
-  scoreboard: Scoreboard;
+  scoreboard: Omit<Scoreboard, 'solves'>;
   /** Latest solves, newest first, capped at 10. */
   solves: Solve[];
   stats: Stats;

@@ -20,7 +20,7 @@ interface MockTeam {
   division: Division;
   players: string[];
   skill: number;
-  solved: Map<number, number>; // challengeId -> solve time
+  solved: Map<number, Solve>; // challengeId -> solve
 }
 
 const pick = <T>(xs: T[]) => xs[Math.floor(Math.random() * xs.length)]!;
@@ -51,7 +51,6 @@ export function createMockSource(): GzctfSource {
   );
 
   const listeners: ((s: Solve) => void)[] = [];
-  let solveSeq = 0;
 
   /** Stronger teams solve more often; cheaper (easier) challenges fall first. */
   function simulateSolve(time: number): Solve | null {
@@ -60,9 +59,8 @@ export function createMockSource(): GzctfSource {
     const team = weighted(candidates, (t) => t.skill);
     const open = challenges.filter((c) => !team.solved.has(c.id));
     const chal = weighted(open, (c) => 1 / c.points ** 2);
-    team.solved.set(chal.id, time);
-    return {
-      id: `mock-${++solveSeq}`,
+    const solve: Solve = {
+      id: `${team.id}-${chal.id}`,
       teamId: team.id,
       teamName: team.name,
       division: team.division,
@@ -72,6 +70,8 @@ export function createMockSource(): GzctfSource {
       category: chal.category,
       time,
     };
+    team.solved.set(chal.id, solve);
+    return solve;
   }
 
   // Backfill history for the time already elapsed, so the scoreboard isn't empty on boot.
@@ -104,9 +104,9 @@ export function createMockSource(): GzctfSource {
       const rows = teams.map((t) => {
         let score = 0;
         let last = 0;
-        for (const [id, time] of t.solved) {
-          score += points.get(id)!;
-          last = Math.max(last, time);
+        for (const s of t.solved.values()) {
+          score += points.get(s.challengeId)!;
+          last = Math.max(last, s.time);
         }
         return { t, score, last };
       });
@@ -125,7 +125,8 @@ export function createMockSource(): GzctfSource {
         ...c,
         solvedCount: teams.filter((t) => t.solved.has(c.id)).length,
       }));
-      return { entries, challenges: out };
+      const solves = teams.flatMap((t) => [...t.solved.values()]);
+      return { entries, challenges: out, solves };
     },
     onSolve(cb) {
       listeners.push(cb);

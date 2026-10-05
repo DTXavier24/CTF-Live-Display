@@ -1,4 +1,4 @@
-import type { DisplayState, Division, Game, Phase, Scoreboard, ServerToClientEvents, Solve } from '@iboh/shared';
+import type { DisplayState, Division, Game, Phase, ServerToClientEvents, Solve } from '@iboh/shared';
 import type { FastifyBaseLogger } from 'fastify';
 import type { Server } from 'socket.io';
 import { config } from './config.js';
@@ -17,8 +17,11 @@ export function phaseAt(game: Game | null, now: number): Phase {
 export function startState(source: GzctfSource, io: Server<{}, ServerToClientEvents>, log: FastifyBaseLogger) {
   // Last-known data survives restarts: stale over blank.
   let game = kv.get<Game>('game') ?? null;
-  let scoreboard = kv.get<Scoreboard>('scoreboard') ?? { entries: [], challenges: [] };
+  let scoreboard = kv.get<DisplayState['scoreboard']>('scoreboard') ?? { entries: [], challenges: [] };
   let solves = kv.get<Solve[]>('solves') ?? [];
+  // Solve ids already handled. Until the first scoreboard arrives, history is unknown.
+  const seen = new Set(solves.map((s) => s.id));
+  let primed = false;
   let recent: { time: number; division: Division }[] = [];
   let dataDelayed = true; // until the first successful fetch
   let lastPhase: Phase | null = null;
@@ -51,16 +54,40 @@ export function startState(source: GzctfSource, io: Server<{}, ServerToClientEve
     io.emit('state', s);
   };
 
-  source.onSolve((solve) => {
-    solves = [solve, ...solves].slice(0, FEED_SIZE);
+  /** Hub and scoreboard diff both land here; the shared id makes it once-only. */
+  function addSolve(solve: Solve) {
+    if (seen.has(solve.id)) return false;
+    seen.add(solve.id);
+    solves = [solve, ...solves].sort((a, b) => b.time - a.time).slice(0, FEED_SIZE);
     recent.push({ time: solve.time, division: solve.division });
+    return true;
+  }
+
+  source.onSolve((solve) => {
+    if (!addSolve(solve)) return;
     kv.set('solves', solves);
     push();
   });
 
+  function syncHistory(history: Solve[]) {
+    if (!primed) {
+      // Boot: everything so far is history, not news. Seed an empty feed so it's never blank.
+      if (!solves.length) solves = [...history].sort((a, b) => b.time - a.time).slice(0, FEED_SIZE);
+      history.forEach((s) => seen.add(s.id));
+      primed = true;
+    } else {
+      // Anything the hub missed (disconnected, or unknown team at the time).
+      history.filter((s) => !seen.has(s.id)).forEach(addSolve);
+    }
+    kv.set('solves', solves);
+  }
+
   async function poll() {
     try {
-      [game, scoreboard] = await Promise.all([source.getGame(), source.getScoreboard()]);
+      const [g, board] = await Promise.all([source.getGame(), source.getScoreboard()]);
+      game = g;
+      scoreboard = { entries: board.entries, challenges: board.challenges };
+      syncHistory(board.solves);
       kv.set('game', game);
       kv.set('scoreboard', scoreboard);
       dataDelayed = false;

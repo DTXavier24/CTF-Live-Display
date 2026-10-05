@@ -12,7 +12,8 @@
     "dev:mock": "concurrently -k -n server,web -c cyan,magenta \"npm run dev -w server -- --mock\" \"npm run dev -w web\"",
     "build": "npm run build -w web && npm run build -w server",
     "start": "npm start -w server",
-    "typecheck": "npm run typecheck -w server && npm run typecheck -w web"
+    "typecheck": "npm run typecheck -w server && npm run typecheck -w web",
+    "test": "npm test -w server"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

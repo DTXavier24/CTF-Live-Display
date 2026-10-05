@@ -5,6 +5,7 @@ import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { Server } from 'socket.io';
 import { config } from './config.js';
+import { createGzctfClient } from './gzctf/client.js';
 import { createMockSource } from './gzctf/mock.js';
 import { startState } from './state.js';
 
@@ -20,12 +21,6 @@ if (existsSync(webDist)) {
   app.get('/admin', (_req, reply) => reply.sendFile('index.html'));
 }
 
-if (!config.mock) {
-  // ponytail: real GZCTF client lands in phase 2, after verifying endpoints against the deployed OpenAPI docs.
-  app.log.fatal('Real GZCTF client not implemented yet. Run with MOCK_GZCTF=1 (npm run dev:mock).');
-  process.exit(1);
-}
-
 await app.listen({ port: config.port, host: '0.0.0.0' });
-app.log.info(`mock GZCTF mode: ${config.mock}`);
-startState(createMockSource(), io, app.log);
+app.log.info(config.gzctf ? `GZCTF: ${config.gzctf.baseUrl} game ${config.gzctf.gameId}` : 'mock GZCTF mode');
+startState(config.gzctf ? createGzctfClient(config.gzctf, app.log) : createMockSource(), io, app.log);
