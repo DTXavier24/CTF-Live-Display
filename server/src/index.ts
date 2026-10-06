@@ -1,12 +1,12 @@
 import fastifyStatic from '@fastify/static';
-import type { ClientToServerEvents, LogEntry, ServerToClientEvents } from '@iboh/shared';
+import type { AutoTemplate, ClientToServerEvents, LogEntry, ServerToClientEvents } from '@iboh/shared';
 import Fastify from 'fastify';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { Server } from 'socket.io';
 import { registerAdmin } from './admin.js';
 import { config } from './config.js';
-import { createDetectors } from './detectors.js';
+import { autoConfig, createDetectors } from './detectors.js';
 import { createGzctfClient } from './gzctf/client.js';
 import { createMockSource } from './gzctf/mock.js';
 import { MEDIA } from './media.js';
@@ -53,7 +53,8 @@ const detectors = createDetectors({
   log: app.log,
   queue: (template, input) => {
     try {
-      engine?.add({ template, input });
+      const seconds = autoConfig().durations[template as AutoTemplate];
+      engine?.add({ template, input, durationMs: seconds ? Math.round(seconds * 1000) : undefined });
       app.log.info({ template }, 'auto-event queued');
     } catch (err) {
       app.log.error({ err, template }, 'auto-event rejected');

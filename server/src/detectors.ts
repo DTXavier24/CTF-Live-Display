@@ -12,6 +12,7 @@ const DEFAULTS: AutoConfig = {
   onFire: { enabled: true, count: 3, windowMin: 10, cooldownMin: 30 },
   milestone: { enabled: true, list: [100, 250, 500, 750, 1000] },
   staleMin: 5,
+  durations: { blood: 8, takeover: 10, 'wall-falls': 10, 'on-fire': 8, milestone: 8 },
 };
 
 const minutes = z.number().min(0).max(24 * 60);
@@ -22,9 +23,18 @@ export const AutoConfigSchema = z.object({
   onFire: z.object({ enabled: z.boolean(), count: z.number().int().min(2).max(50), windowMin: minutes, cooldownMin: minutes }),
   milestone: z.object({ enabled: z.boolean(), list: z.array(z.number().int().positive()).max(50) }),
   staleMin: minutes,
+  durations: z.object({
+    blood: z.number().min(3).max(120),
+    takeover: z.number().min(3).max(120),
+    'wall-falls': z.number().min(3).max(120),
+    'on-fire': z.number().min(3).max(120),
+    milestone: z.number().min(3).max(120),
+  }),
 });
 
-let config: AutoConfig = { ...DEFAULTS, ...kv.get<Partial<AutoConfig>>('autoConfig') };
+const stored = kv.get<Partial<AutoConfig>>('autoConfig');
+// Settings saved before a field existed pick up its default.
+let config: AutoConfig = { ...DEFAULTS, ...stored, durations: { ...DEFAULTS.durations, ...stored?.durations } };
 export const autoConfig = () => config;
 export function setAutoConfig(next: AutoConfig) {
   config = next;

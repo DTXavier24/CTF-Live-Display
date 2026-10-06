@@ -1,4 +1,4 @@
-import type { AutoConfig, AutoEventKind, LoopEntry, NowPlaying, PhaseOverride, QueueItem, TemplateId, TemplatePayloads } from '@iboh/shared';
+import type { AutoConfig, AutoEventKind, AutoTemplate, LoopEntry, NowPlaying, PhaseOverride, QueueItem, TemplateId, TemplatePayloads } from '@iboh/shared';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { fmtClock, fmtDuration, serverNow, useNow } from '../server';
 import { templateComponents } from '../templates';
@@ -29,6 +29,7 @@ const TEMPLATES: Record<TemplateId, { label: string; manual: boolean; fields?: F
   spotlight: { label: 'Team spotlight', manual: true },
   'countdown-end': { label: 'Countdown to end', manual: true },
   'countdown-start': { label: 'Countdown to start', manual: true },
+  idle: { label: 'Idle (logo only)', manual: true },
   // Auto-events: detected by the server, never added by hand.
   blood: { label: 'Blood', manual: false },
   takeover: { label: 'Takeover', manual: false },
@@ -316,6 +317,7 @@ function TemplatePreview({ template, input, state }: { template: TemplateId; inp
   if (template === 'announcement') payload = { title: input.title || 'Your title here', body: input.body ?? '' } satisfies TemplatePayloads['announcement'];
   if (template === 'countdown-end' && state.game) payload = { target: state.game.end, label: 'Time remaining' };
   if (template === 'countdown-start' && state.game) payload = { target: state.game.start, label: 'CTF starts in' };
+  if (template === 'idle') payload = {};
   if (template === 'sponsor-video') {
     const file = input.file || state.media.videos[0];
     payload = file ? { url: `/media/videos/${encodeURIComponent(file)}` } : null;
@@ -464,6 +466,14 @@ export function AutoEvents({ state, run }: PanelProps) {
           </label>
         </div>
         <NumberField label="Skip auto-events older than" suffix="min" value={c.staleMin} onChange={(staleMin) => set({ staleMin })} />
+        <div>
+          <p className="mb-2 text-sm">Card duration on screen (seconds)</p>
+          <div className="grid grid-cols-5 gap-3">
+            {(['blood', 'takeover', 'wall-falls', 'on-fire', 'milestone'] as AutoTemplate[]).map((t) => (
+              <NumberField key={t} label={label(t)} min={3} value={c.durations[t]} onChange={(v) => set({ durations: { ...c.durations, [t]: v } })} />
+            ))}
+          </div>
+        </div>
         {dirty && <p className="text-xs text-red">Unsaved changes.</p>}
       </div>
     </Card>

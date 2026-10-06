@@ -1,3 +1,4 @@
+import { MotionConfig } from 'motion/react';
 import { useEffect, useState, type ReactNode } from 'react';
 
 const W = 1920;
@@ -18,7 +19,8 @@ export function Stage({ children }: { children: ReactNode }) {
         className="dots absolute top-1/2 left-1/2 overflow-hidden"
         style={{ width: W, height: H, transform: `translate(-50%, -50%) scale(${scale})` }}
       >
-        {children}
+        {/* Honour the OS reduced-motion setting for every Motion animation on the display. */}
+        <MotionConfig reducedMotion="user">{children}</MotionConfig>
       </div>
     </div>
   );

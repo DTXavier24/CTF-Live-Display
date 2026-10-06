@@ -34,6 +34,7 @@ beforeEach(() => {
     onFire: { enabled: true, count: 3, windowMin: 10, cooldownMin: 30 },
     milestone: { enabled: true, list: [5] },
     staleMin: 5,
+    durations: { blood: 8, takeover: 10, 'wall-falls': 10, 'on-fire': 8, milestone: 8 },
   });
 });
 

@@ -113,6 +113,7 @@ export interface TemplatePayloads {
   top10: { boards: Top10Board[] };
   unsolved: { categories: { category: string; challenges: string[] }[]; total: number };
   'sponsor-video': { url: string };
+  idle: Record<string, never>;
   blood: { rank: 1 | 2 | 3; division: Division; team: string; player: string; challenge: string; category: string; time: number };
   takeover: { division: Division; leader: { name: string; score: number }; dethroned: { name: string; score: number }; gap: number };
   'wall-falls': { challenge: string; category: string; stoodMs: number; team: string; player: string; division: Division };
@@ -130,6 +131,8 @@ export interface TemplatePayloads {
 }
 
 export type AutoEventKind = 'takeover' | 'wall-falls' | 'on-fire' | 'milestone';
+/** Templates the detectors queue on their own. */
+export type AutoTemplate = 'blood' | AutoEventKind;
 
 export interface AutoConfig {
   bloods: boolean;
@@ -139,6 +142,8 @@ export interface AutoConfig {
   milestone: { enabled: boolean; list: number[] };
   /** Auto-events detected longer ago than this are dropped at play time. */
   staleMin: number;
+  /** How long each auto-event card stays on screen, in seconds. */
+  durations: Record<AutoTemplate, number>;
 }
 export type TemplateId = keyof TemplatePayloads;
 

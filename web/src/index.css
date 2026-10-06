@@ -59,6 +59,166 @@ body {
   to { transform: translateX(-50%); }
 }
 
+/* ---------- Broadcast vocabulary (display) ----------
+ * Motion rule: one hit per arrival, never a loop that flashes. Everything that moves has a
+ * reduced-motion fallback at the bottom of this block. Components layer: utilities override.
+ */
+@layer components {
+  
+  /* Faint scanlines drifting over the dot field, plus one soft refresh band. */
+  .scanlines {
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    z-index: 40;
+    background-image: repeating-linear-gradient(to bottom, rgba(244, 246, 248, 0.03) 0 1px, transparent 1px 4px);
+    animation: scan-drift 14s linear infinite;
+  }
+  .scanlines::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, transparent, rgba(72, 224, 224, 0.045) 50%, transparent);
+    background-size: 100% 220px;
+    background-repeat: no-repeat;
+    animation: scan-band 9s linear infinite;
+  }
+  @keyframes scan-drift {
+    to { background-position: 0 80px; }
+  }
+  @keyframes scan-band {
+    from { background-position: 0 -220px; }
+    to { background-position: 0 1300px; }
+  }
+  
+  /* HUD frame: cyan corner brackets on the two square corners of a chamfered panel. */
+  .hud-frame::before,
+  .hud-frame::after {
+    content: '';
+    position: absolute;
+    width: 34px;
+    height: 34px;
+    pointer-events: none;
+    border-color: var(--color-cyan);
+    border-style: solid;
+  }
+  .hud-frame::before {
+    top: 0;
+    right: 0;
+    border-width: 3px 3px 0 0;
+  }
+  .hud-frame::after {
+    bottom: 0;
+    left: 0;
+    border-width: 0 0 3px 3px;
+  }
+  
+  /* Solid label plate with a cut trailing edge: names an event the way a broadcast tag does. */
+  .plate {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.12em 0.85em 0.12em 0.4em;
+    font-family: var(--font-display);
+    font-weight: 700;
+    line-height: 1;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+    color: var(--color-bg);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 0.45em) 100%, 0 100%);
+  }
+  .plate-cyan { background: var(--color-cyan); }
+  .plate-red { background: var(--color-red); }
+  .plate-fg { background: var(--color-fg); }
+  .plate-dark { background: var(--color-bg); color: var(--color-fg); }
+  
+  /* Headline arrival: lands oversized and blurred, snaps sharp, with one chromatic hit. */
+  .hit {
+    animation:
+      slam 560ms cubic-bezier(0.16, 1, 0.3, 1) both,
+      glitch-hit 480ms steps(1, end) 100ms both;
+  }
+  @keyframes slam {
+    from { opacity: 0; transform: scale(1.22); filter: blur(12px); }
+    55% { opacity: 1; }
+    to { transform: none; filter: none; }
+  }
+  /* Three offsets in under half a second, then the static split: well under flash thresholds. */
+  @keyframes glitch-hit {
+    0% { text-shadow: -12px 0 0 rgba(72, 224, 224, 0.9), 12px 0 0 rgba(240, 92, 85, 0.9); }
+    33% { text-shadow: 8px 0 0 rgba(72, 224, 224, 0.9), -8px 0 0 rgba(240, 92, 85, 0.9); }
+    66% { text-shadow: -5px 0 0 rgba(72, 224, 224, 0.85), 5px 0 0 rgba(240, 92, 85, 0.85); }
+    100% { text-shadow: -3px 0 0 rgba(72, 224, 224, 0.85), 3px 0 0 rgba(240, 92, 85, 0.85); }
+  }
+  /* Plates and bars arrive by extending from their anchored edge. */
+  .extend {
+    transform-origin: left center;
+    animation: extend 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  @keyframes extend {
+    from { transform: scaleX(0); }
+    to { transform: none; }
+  }
+  
+  /* Diagonal hazard stripes behind event cards, travelling slowly. */
+  .stripes {
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    background-image: repeating-linear-gradient(-45deg, currentColor 0 3px, transparent 3px 18px);
+    opacity: 0.08;
+    animation: stripes 2.4s linear infinite;
+  }
+  @keyframes stripes {
+    to { background-position: 50.9px 0; }
+  }
+  
+  /* A new feed row lights up once, then settles. */
+  .row-hit {
+    animation: row-hit 1.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .row-hit-blood {
+    animation: row-hit-blood 1.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  @keyframes row-hit {
+    from { background-color: rgba(72, 224, 224, 0.4); }
+  }
+  @keyframes row-hit-blood {
+    from { background-color: rgba(240, 92, 85, 0.6); }
+  }
+  
+  /* Live indicator: a slow ring, not a blink. */
+  .live-dot {
+    position: relative;
+  }
+  .live-dot::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 999px;
+    background: inherit;
+    animation: live-ring 2.4s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  }
+  @keyframes live-ring {
+    from { transform: scale(1); opacity: 0.7; }
+    to { transform: scale(3); opacity: 0; }
+  }
+  
+  @media (prefers-reduced-motion: reduce) {
+    .scanlines,
+    .scanlines::after,
+    .stripes,
+    .live-dot::after,
+    .ticker {
+      animation: none;
+    }
+    .hit,
+    .extend {
+      animation: glitch-hit 1ms both;
+    }
+  }
+}
+
 /* ---------- Admin panel ----------
  * An operator console, not a broadcast surface: normal responsive layout, same tokens.
  * In the components layer so Tailwind utilities (w-20, etc.) can override these.

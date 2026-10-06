@@ -1,23 +1,45 @@
 // Auto-event cards: bloods, Takeover, The Wall Falls, On Fire, Milestone, Team spotlight.
+// Shared grammar: a solid plate names the event, the headline lands with `.hit`, details rise after.
 import type { Division, TemplatePayloads } from '@iboh/shared';
 import { motion } from 'motion/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { CountUp } from '../CountUp';
 import { fmtClock } from '../server';
 import type { TemplateProps } from './index';
 
-const EASE = [0.2, 0.7, 0.2, 1] as const;
+const EASE = [0.16, 1, 0.3, 1] as const;
 export const ordinal = (n: number) => `${n}${n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th'}`;
-const BLOOD_COLOR = { 1: 'text-red', 2: 'text-cyan', 3: 'text-fg' } as const;
 
-function DivisionLabel({ division, className = '' }: { division: Division; className?: string }) {
-  return <p className={`eyebrow text-2xl text-fg-muted ${className}`}>{division} division</p>;
+/** 1st blood is red, 2nd cyan, 3rd white: distinct at a glance from the back of the hall. */
+const RANK = {
+  1: { plate: 'plate-red', text: 'text-red' },
+  2: { plate: 'plate-cyan', text: 'text-cyan' },
+  3: { plate: 'plate-fg', text: 'text-fg' },
+} as const;
+
+/** The event's name on a solid plate, extending from its left edge. */
+export function EventPlate({ tone, children, className = '', delay = 0.25, size = 'text-[64px]' }: { tone: string; children: ReactNode; className?: string; delay?: number; size?: string }) {
+  return (
+    <div className={`extend shrink-0 ${className}`} style={{ animationDelay: `${delay}s` }}>
+      <span className={`plate ${tone} ${size}`}>{children}</span>
+    </div>
+  );
 }
 
-/** Slides up into place, staggered by `delay`. */
-function Rise({ delay = 0, children, className = '' }: { delay?: number; children: React.ReactNode; className?: string }) {
+function DivisionPlate({ division, delay = 0.35 }: { division: Division; delay?: number }) {
   return (
-    <motion.div className={className} initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay, duration: 0.6, ease: EASE }}>
+    <span className="extend inline-block" style={{ animationDelay: `${delay}s` }}>
+      <span className={`plate text-2xl ${division === 'Local' ? 'plate-cyan' : 'plate-dark shadow-[inset_0_0_0_2px_var(--color-cyan)]'}`}>
+        {division}
+      </span>
+    </span>
+  );
+}
+
+/** Slides up into place after the headline has landed. */
+function Rise({ delay = 0, children, className = '' }: { delay?: number; children: ReactNode; className?: string }) {
+  return (
+    <motion.div className={className} initial={{ opacity: 0, y: 36 }} animate={{ opacity: 1, y: 0 }} transition={{ delay, duration: 0.5, ease: EASE }}>
       {children}
     </motion.div>
   );
@@ -25,29 +47,24 @@ function Rise({ delay = 0, children, className = '' }: { delay?: number; childre
 
 export function Blood({ item }: TemplateProps<'blood'>) {
   const p = item.payload as TemplatePayloads['blood'];
+  const tone = RANK[p.rank];
   return (
-    <div className="relative flex h-full flex-col justify-center overflow-hidden px-6">
-      {/* A slash wipes across before the text lands. */}
-      <motion.div
-        className={`absolute inset-y-0 -left-1/4 w-1/3 -skew-x-12 ${p.rank === 1 ? 'bg-red/25' : p.rank === 2 ? 'bg-cyan/20' : 'bg-fg/10'}`}
-        initial={{ x: '-120%' }}
-        animate={{ x: '420%' }}
-        transition={{ duration: 0.9, ease: EASE }}
-      />
-      <Rise>
-        <DivisionLabel division={p.division} />
+    <div className={`relative flex h-full flex-col justify-center overflow-hidden px-6 ${tone.text}`}>
+      <div className="stripes" />
+      <div className="relative flex items-center gap-4">
+        <EventPlate tone={tone.plate}>{ordinal(p.rank)} blood</EventPlate>
+        <DivisionPlate division={p.division} />
+      </div>
+      <p className="glitch hit relative mt-10 truncate font-display text-[104px] leading-none font-bold text-fg" style={{ animationDelay: '0.45s' }}>
+        {p.team}
+      </p>
+      <Rise delay={0.8} className="relative mt-4 text-4xl text-fg-muted">
+        by <span className="font-semibold text-fg">{p.player || 'unknown player'}</span>
       </Rise>
-      <Rise delay={0.15}>
-        <p className={`glitch font-display text-[120px] leading-none font-bold uppercase ${BLOOD_COLOR[p.rank]}`}>{ordinal(p.rank)} blood</p>
-      </Rise>
-      <Rise delay={0.35}>
-        <p className="mt-8 truncate font-display text-7xl font-bold">{p.team}</p>
-        <p className="mt-2 text-3xl text-fg-muted">by {p.player || 'unknown player'}</p>
-      </Rise>
-      <Rise delay={0.55} className="mt-10 flex items-center gap-5">
-        <span className="border border-line bg-bg/60 px-4 py-2 font-display text-3xl">{p.challenge}</span>
-        <span className="eyebrow text-xl text-cyan">{p.category}</span>
-        <span className="ml-auto font-display text-3xl text-fg-muted">{fmtClock(p.time)}</span>
+      <Rise delay={1} className="relative mt-12 flex items-center gap-5 text-fg">
+        <span className="bg-bg px-5 py-3 font-display text-4xl font-semibold shadow-[inset_0_0_0_2px_currentColor]">{p.challenge}</span>
+        <span className={`font-display text-2xl font-bold tracking-[0.1em] uppercase ${tone.text}`}>{p.category}</span>
+        <span className="ml-auto font-display text-4xl text-fg-muted">{fmtClock(p.time)}</span>
       </Rise>
     </div>
   );
@@ -55,10 +72,10 @@ export function Blood({ item }: TemplateProps<'blood'>) {
 
 export function Takeover({ item }: TemplateProps<'takeover'>) {
   const p = item.payload as TemplatePayloads['takeover'];
-  // Start in the old order, then the challenger moves past the old leader.
+  // Start in the old order, then the challenger drives past the old leader.
   const [swapped, setSwapped] = useState(false);
   useEffect(() => {
-    const t = setTimeout(() => setSwapped(true), 1300);
+    const t = setTimeout(() => setSwapped(true), 1500);
     return () => clearTimeout(t);
   }, []);
   const rows = [
@@ -67,29 +84,33 @@ export function Takeover({ item }: TemplateProps<'takeover'>) {
   ];
   const order = swapped ? rows : [...rows].reverse();
   return (
-    <div className="flex h-full flex-col justify-center px-6">
-      <Rise>
-        <p className="eyebrow text-2xl text-red">Takeover</p>
-        <p className="font-display text-8xl font-bold uppercase">
-          New #1 <span className="text-cyan">· {p.division}</span>
-        </p>
-      </Rise>
-      <div className="mt-12 flex flex-col gap-4">
-        {order.map((r, i) => (
-          <motion.div
-            key={r.key}
-            layout
-            transition={{ type: 'spring', stiffness: 90, damping: 18 }}
-            className={`flex h-28 items-center gap-8 px-8 ${swapped && r.isLeader ? 'bg-cyan/15' : 'bg-bg/60'}`}
-          >
-            <span className="w-20 font-display text-6xl font-bold text-cyan">#{i + 1}</span>
-            <span className="min-w-0 flex-1 truncate font-display text-6xl font-bold">{r.name}</span>
-            <span className="font-display text-5xl tabular-nums">{r.score}</span>
-          </motion.div>
-        ))}
+    <div className="relative flex h-full flex-col justify-center overflow-hidden px-6 text-red">
+      <div className="stripes" />
+      <div className="relative flex items-center gap-4">
+        <EventPlate tone="plate-red">Takeover</EventPlate>
+        <DivisionPlate division={p.division} />
       </div>
-      <Rise delay={1.9} className="mt-8 text-right font-display text-4xl text-fg-muted">
-        Lead by <span className="text-cyan">{p.gap}</span> pts
+      <div className="relative mt-12 flex flex-col gap-4 text-fg">
+        {order.map((r, i) => {
+          const lead = swapped && r.isLeader;
+          return (
+            <motion.div
+              key={r.key}
+              layout
+              initial={{ opacity: 0, x: -80 }}
+              animate={{ opacity: 1, x: 0, scale: lead ? 1.03 : 1 }}
+              transition={{ layout: { type: 'spring', stiffness: 140, damping: 16 }, delay: 0.5 + i * 0.12, duration: 0.45, ease: EASE }}
+              className={`flex h-32 items-center gap-8 px-8 ${lead ? 'bg-cyan text-bg' : 'bg-bg/80'}`}
+            >
+              <span className={`w-24 font-display text-7xl font-bold ${lead ? '' : 'text-cyan'}`}>#{i + 1}</span>
+              <span className="min-w-0 flex-1 truncate font-display text-6xl font-bold">{r.name}</span>
+              <span className="font-display text-6xl font-bold tabular-nums">{r.score}</span>
+            </motion.div>
+          );
+        })}
+      </div>
+      <Rise delay={2.1} className="relative mt-8 text-right font-display text-5xl font-semibold text-fg-muted">
+        Leads by <span className="text-cyan">{p.gap}</span> pts
       </Rise>
     </div>
   );
@@ -109,34 +130,48 @@ export function WallFalls({ item }: TemplateProps<'wall-falls'>) {
   const tiles = Array.from({ length: TILE_COLS * TILE_ROWS }, (_, i) => {
     const r = Math.sin(i * 12.9898) * 43758.5453;
     const rand = r - Math.floor(r);
-    return { i, rot: (rand - 0.5) * 70, dx: (rand - 0.5) * 160, delay: 0.9 + (Math.floor(i / TILE_COLS) / TILE_ROWS) * 0.5 + rand * 0.35 };
+    return { i, rot: (rand - 0.5) * 90, dx: (rand - 0.5) * 220, delay: 1.25 + (Math.floor(i / TILE_COLS) / TILE_ROWS) * 0.45 + rand * 0.3 };
   });
   return (
     <div className="relative h-full overflow-hidden">
       <div className="flex h-full flex-col justify-center px-6">
-        <p className="eyebrow text-2xl text-red">The wall falls</p>
-        <p className="font-display text-7xl font-bold">{p.challenge}</p>
+        <span className="plate plate-red self-start text-[64px]">The wall falls</span>
+        <p className="mt-8 font-display text-7xl font-bold">{p.challenge}</p>
         <p className="mt-3 font-display text-4xl text-fg-muted">
-          Unsolved for <span className="text-red">{fmtStood(p.stoodMs)}</span> · {p.category}
+          Unsolved for <span className="font-bold text-red">{fmtStood(p.stoodMs)}</span> · {p.category}
         </p>
-        <p className="mt-12 truncate font-display text-7xl font-bold text-cyan">{p.team}</p>
-        <p className="mt-2 text-3xl text-fg-muted">
+        <p className="glitch hit mt-12 truncate font-display text-[96px] leading-none font-bold text-cyan" style={{ animationDelay: '1.7s' }}>
+          {p.team}
+        </p>
+        <p className="mt-4 text-3xl text-fg-muted">
           by {p.player || 'unknown player'} · {p.division}
         </p>
       </div>
-      {/* The wall: tiles crack, then fall away to reveal the solver. */}
-      <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${TILE_COLS}, 1fr)` }}>
+      {/* The wall: holds, shudders once, then breaks apart to reveal the solver. */}
+      <motion.div
+        className="absolute inset-0 grid"
+        style={{ gridTemplateColumns: `repeat(${TILE_COLS}, 1fr)` }}
+        animate={{ x: [0, -10, 9, -6, 4, 0] }}
+        transition={{ delay: 0.75, duration: 0.45, ease: 'easeOut' }}
+      >
         {tiles.map((t) => (
           <motion.div
             key={t.i}
-            className="border border-bg bg-bg-2"
-            style={{ backgroundImage: 'linear-gradient(135deg, rgba(240,92,85,0.12), transparent 60%)' }}
+            className="border-2 border-bg bg-bg-2"
+            style={{ backgroundImage: 'linear-gradient(135deg, rgba(240,92,85,0.22), transparent 65%)' }}
             initial={{ y: 0, x: 0, rotate: 0, opacity: 1 }}
-            animate={{ y: 900, x: t.dx, rotate: t.rot, opacity: 0 }}
-            transition={{ delay: t.delay, duration: 1.1, ease: [0.5, 0, 0.75, 0] }}
+            animate={{ y: 1000, x: t.dx, rotate: t.rot, opacity: 0 }}
+            transition={{ delay: t.delay, duration: 0.9, ease: [0.55, 0, 0.8, 0.2] }}
           />
         ))}
-      </div>
+        <motion.span
+          className="pointer-events-none absolute inset-0 flex items-center justify-center font-display text-[64px] font-bold tracking-[0.2em] text-red/60 uppercase"
+          animate={{ opacity: 0, scale: 1.15 }}
+          transition={{ delay: 1.2, duration: 0.3 }}
+        >
+          Unsolved
+        </motion.span>
+      </motion.div>
     </div>
   );
 }
@@ -145,27 +180,28 @@ export function OnFire({ item }: TemplateProps<'on-fire'>) {
   const p = item.payload as TemplatePayloads['on-fire'];
   return (
     <div className="relative flex h-full flex-col justify-center overflow-hidden px-6">
-      {/* Slow heat glow rising from the bottom: breathes, never flashes. */}
+      {/* Heat rising from the bottom edge: breathes slowly, never flashes. */}
       <motion.div
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-3/4"
-        style={{ background: 'radial-gradient(ellipse at 50% 100%, rgba(240,92,85,0.45), rgba(240,140,60,0.18) 40%, transparent 70%)' }}
-        animate={{ opacity: [0.6, 1, 0.6], scaleY: [1, 1.08, 1] }}
-        transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-full origin-bottom"
+        style={{ background: 'radial-gradient(ellipse 80% 70% at 50% 100%, rgba(240,92,85,0.6), rgba(240,140,60,0.22) 45%, transparent 75%)' }}
+        initial={{ opacity: 0, scaleY: 0.4 }}
+        animate={{ opacity: [0.75, 1, 0.75], scaleY: [1, 1.1, 1] }}
+        transition={{ opacity: { duration: 3, repeat: Infinity, ease: 'easeInOut' }, scaleY: { duration: 3, repeat: Infinity, ease: 'easeInOut' } }}
       />
-      <Rise className="relative">
-        <DivisionLabel division={p.division} />
-        <p className="glitch font-display text-[120px] leading-none font-bold text-red uppercase">On fire</p>
+      <div className="relative flex items-center gap-4">
+        <EventPlate tone="plate-red">On fire</EventPlate>
+        <DivisionPlate division={p.division} />
+      </div>
+      <p className="glitch hit relative mt-10 truncate font-display text-[104px] leading-none font-bold" style={{ animationDelay: '0.45s' }}>
+        {p.team}
+      </p>
+      <Rise delay={0.8} className="relative mt-4 font-display text-5xl font-semibold text-fg-muted">
+        <span className="text-red">{p.count}</span> solves in a row
       </Rise>
-      <Rise delay={0.3} className="relative">
-        <p className="mt-6 truncate font-display text-7xl font-bold">{p.team}</p>
-        <p className="mt-2 font-display text-4xl text-fg-muted">
-          <span className="text-red">{p.count}</span> solves in a row
-        </p>
-      </Rise>
-      <div className="relative mt-10 flex flex-wrap gap-3">
+      <div className="relative mt-12 flex flex-wrap gap-3">
         {p.challenges.map((c, i) => (
-          <Rise key={c} delay={0.6 + i * 0.15}>
-            <span className="border border-red/50 bg-bg/70 px-4 py-2 font-display text-3xl">{c}</span>
+          <Rise key={c} delay={1 + i * 0.12}>
+            <span className="bg-bg/80 px-5 py-2.5 font-display text-3xl font-semibold shadow-[inset_0_0_0_2px_var(--color-red)]">{c}</span>
           </Rise>
         ))}
       </div>
@@ -176,17 +212,30 @@ export function OnFire({ item }: TemplateProps<'on-fire'>) {
 export function Milestone({ item }: TemplateProps<'milestone'>) {
   const p = item.payload as TemplatePayloads['milestone'];
   return (
-    <div className="flex h-full flex-col items-center justify-center text-center">
-      <p className="eyebrow text-2xl text-cyan">Milestone</p>
-      <p className="glitch font-display text-[220px] leading-none font-bold">
-        <CountUp value={p.milestone} from={0} />
+    <div className="relative flex h-full flex-col items-center justify-center overflow-hidden text-center">
+      {/* Two rings expand once from behind the number as it lands. */}
+      {[0, 0.25].map((d) => (
+        <motion.span
+          key={d}
+          aria-hidden
+          className="absolute h-[420px] w-[420px] rounded-full border-4 border-cyan"
+          initial={{ scale: 0.3, opacity: 0.9 }}
+          animate={{ scale: 2.4, opacity: 0 }}
+          transition={{ delay: 0.5 + d, duration: 1.4, ease: EASE }}
+        />
+      ))}
+      <span className="extend relative" style={{ animationDelay: '0.2s' }}>
+        <span className="plate plate-cyan text-5xl">Milestone</span>
+      </span>
+      <p className="glitch hit relative font-display text-[260px] leading-none font-bold" style={{ animationDelay: '0.35s' }}>
+        <CountUp value={p.milestone} from={Math.max(0, p.milestone - 60)} />
       </p>
-      <p className="eyebrow mt-2 text-3xl text-fg-muted">Flags captured</p>
-      <Rise delay={1.2} className="mt-12">
-        <p className="font-display text-5xl">
+      <p className="relative font-display text-3xl font-semibold tracking-[0.14em] text-fg-muted uppercase">Flags captured</p>
+      <Rise delay={1.3} className="relative mt-12">
+        <p className="font-display text-5xl font-semibold">
           Flag #{p.milestone} by <span className="text-cyan">{p.player || p.team}</span>
         </p>
-        <p className="mt-2 text-3xl text-fg-muted">
+        <p className="mt-3 text-3xl text-fg-muted">
           {p.team} · {p.division}
         </p>
       </Rise>
@@ -203,24 +252,26 @@ export function Spotlight({ item }: TemplateProps<'spotlight'>) {
     ['Strongest', p.topCategory ?? '-'],
   ];
   return (
-    <div className="flex h-full flex-col justify-center px-6">
-      <Rise>
-        <p className="eyebrow text-2xl text-cyan">Team spotlight</p>
-        <p className="truncate font-display text-8xl font-bold">{p.name}</p>
-        <DivisionLabel division={p.division} className="mt-2" />
-      </Rise>
+    <div className="relative flex h-full flex-col justify-center px-6">
+      <div className="flex items-center gap-4">
+        <EventPlate tone="plate-cyan">Spotlight</EventPlate>
+        <DivisionPlate division={p.division} />
+      </div>
+      <p className="glitch hit mt-10 truncate font-display text-[104px] leading-none font-bold" style={{ animationDelay: '0.45s' }}>
+        {p.name}
+      </p>
       <div className="mt-12 grid grid-cols-4 gap-4">
-        {stats.map(([label, value], i) => (
-          <Rise key={label} delay={0.3 + i * 0.12} className="bg-bg/60 px-6 py-5">
-            <p className="eyebrow text-lg text-fg-muted">{label}</p>
-            <p className="truncate font-display text-5xl font-bold">{value}</p>
+        {stats.map(([text, value], i) => (
+          <Rise key={text} delay={0.8 + i * 0.1} className="bg-bg/80 px-6 py-5">
+            <p className="font-display text-lg font-semibold tracking-[0.1em] text-fg-muted uppercase">{text}</p>
+            <p className="truncate font-display text-6xl font-bold">{value}</p>
           </Rise>
         ))}
       </div>
       {p.players.length > 0 && (
-        <Rise delay={0.9} className="mt-10">
-          <p className="eyebrow text-lg text-fg-muted">Players</p>
-          <p className="mt-2 font-display text-3xl">{p.players.join('  ·  ')}</p>
+        <Rise delay={1.3} className="mt-10 font-display text-4xl">
+          <span className="text-fg-muted">Players </span>
+          {p.players.join('  ·  ')}
         </Rise>
       )}
     </div>

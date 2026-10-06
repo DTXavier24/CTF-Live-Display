@@ -101,6 +101,13 @@ export const templates: { [K in TemplateId]: TemplateDef<K> } = {
       return { url: mediaUrl('videos', files[videoTurn++ % files.length]!) };
     },
   },
+  idle: {
+    input: z.object({}),
+    priority: 'normal',
+    durationMs: 15_000,
+    // Brand moment: always has something to show.
+    resolve: () => ({}),
+  },
   blood: {
     input: z.object({ rank: z.union([z.literal(1), z.literal(2), z.literal(3)]), division: Div, team: name, player: name, challenge: name, category: name, time: z.number() }),
     priority: 'high',
