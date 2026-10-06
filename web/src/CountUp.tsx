@@ -8,3 +8,19 @@ export function CountUp({ value, from = value, decimals = 0 }: { value: number; 
   useEffect(() => spring.set(value), [spring, value]);
   return <motion.span className="tabular-nums">{text}</motion.span>;
 }
+
+/**
+ * Fixed-width characters for timers. Chakra Petch has no tabular figures, so without this a
+ * ticking timer changes width every second and shoves whatever is laid out around it.
+ */
+export function Mono({ text }: { text: string }) {
+  return (
+    <>
+      {[...text].map((ch, i) => (
+        <span key={i} className="inline-block text-center" style={{ width: /\d/.test(ch) ? '0.62em' : ch === ':' ? '0.3em' : undefined }}>
+          {ch}
+        </span>
+      ))}
+    </>
+  );
+}

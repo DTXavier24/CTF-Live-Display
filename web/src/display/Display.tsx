@@ -2,7 +2,7 @@ import type { DisplayState, Division, PerDivision, Solve } from '@iboh/shared';
 import { AnimatePresence, motion } from 'motion/react';
 import type { ReactNode } from 'react';
 import { Boundary } from '../Boundary';
-import { CountUp } from '../CountUp';
+import { CountUp, Mono } from '../CountUp';
 import { Featured, isFullscreen } from './Featured';
 import { Stage } from '../Stage';
 import { fmtClock, fmtDuration, useNow, useServerState } from '../server';
@@ -87,8 +87,8 @@ function PreView({ state }: { state: DisplayState }) {
           <img src="/brand/logo_with_text.png" alt="" className="max-h-[200px]" />
           <p className="eyebrow mt-10 text-cyan">14 November 2026 · GMT+8</p>
           <p className="eyebrow mt-8 text-fg-muted">CTF starts in</p>
-          <p className="glitch font-display text-[180px] leading-none font-bold tabular-nums">
-            {state.game ? fmtDuration(state.game.start - now) : '--:--:--'}
+          <p className="glitch font-display text-[180px] leading-none font-bold">
+            <Mono text={state.game ? fmtDuration(state.game.start - now) : '--:--:--'} />
           </p>
         </div>
       </div>
@@ -115,7 +115,7 @@ function LiveView({ state, delayed }: { state: DisplayState; delayed: boolean })
       <Boundary name="top">
         <TopBar state={state} delayed={delayed} />
       </Boundary>
-      <div className="grid min-h-0 grid-cols-[440px_1fr_540px] gap-6 px-8 py-6">
+      <div className="grid min-h-0 grid-cols-[360px_1fr_460px] gap-6 px-8 py-6">
         <Boundary name="stats">
           <StatsPanel state={state} />
         </Boundary>
@@ -152,13 +152,15 @@ function TopBar({ state, delayed }: { state: DisplayState; delayed: boolean }) {
       </div>
       <div className="flex flex-col items-center">
         <span className="eyebrow text-fg-muted">Time remaining</span>
-        <span className="font-display text-7xl leading-none font-bold tabular-nums">
-          {state.game ? fmtDuration(state.game.end - now) : '--:--:--'}
+        <span className="font-display text-7xl leading-none font-bold">
+          <Mono text={state.game ? fmtDuration(state.game.end - now) : '--:--:--'} />
         </span>
       </div>
       <div className="flex w-[440px] items-center justify-end gap-6">
         {state.mock && <span className="eyebrow border border-hair px-2 py-1 text-fg-muted">Mock</span>}
-        <span className="font-display text-3xl text-fg-muted tabular-nums">{fmtClock(now)}</span>
+        <span className="font-display text-3xl text-fg-muted">
+          <Mono text={fmtClock(now)} />
+        </span>
         <span className={`eyebrow flex items-center gap-2 ${delayed ? 'text-red' : 'text-cyan'}`}>
           <span className={`h-3 w-3 rounded-full ${delayed ? 'bg-red' : 'bg-cyan'}`} /> Live
         </span>
@@ -178,12 +180,14 @@ function Panel({ title, children }: { title: string; children: ReactNode }) {
 
 function StatsPanel({ state }: { state: DisplayState }) {
   const { teams, solves, flagsPerMin } = state.stats;
+  const challenges = state.scoreboard.challenges;
   return (
     <Panel title="Live stats">
       <div className="flex h-full flex-col justify-between">
         <Stat label="Teams" values={teams} />
         <Stat label="Solves" values={solves} />
         <Stat label="Flags / min" values={flagsPerMin} decimals={1} />
+        <ChallengeStat solved={challenges.filter((c) => c.solvedCount > 0).length} total={challenges.length} />
       </div>
     </Panel>
   );
@@ -193,16 +197,35 @@ function Stat({ label, values, decimals = 0 }: { label: string; values: PerDivis
   return (
     <div>
       <div className="eyebrow text-fg-muted">{label}</div>
-      <div className="font-display text-7xl leading-tight font-bold">
+      <div className="font-display text-6xl leading-tight font-bold">
         <CountUp value={values.Local + values.International} decimals={decimals} />
       </div>
-      <div className="mt-1 flex gap-6 font-display text-2xl text-fg-muted">
-        <span>
-          Local <span className="text-fg"><CountUp value={values.Local} decimals={decimals} /></span>
-        </span>
-        <span>
-          International <span className="text-fg"><CountUp value={values.International} decimals={decimals} /></span>
-        </span>
+      {(['Local', 'International'] as const).map((d) => (
+        <div key={d} className="flex justify-between font-display text-2xl leading-snug text-fg-muted">
+          <span>{d}</span>
+          <span className="text-fg">
+            <CountUp value={values[d]} decimals={decimals} />
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ChallengeStat({ solved, total }: { solved: number; total: number }) {
+  return (
+    <div>
+      <div className="eyebrow text-fg-muted">Challenges solved</div>
+      <div className="font-display text-6xl leading-tight font-bold">
+        <CountUp value={solved} />
+        <span className="text-4xl text-fg-muted"> / {total}</span>
+      </div>
+      <div className="mt-2 h-2 bg-hair">
+        <motion.div
+          className="h-full bg-cyan"
+          animate={{ width: total ? `${(solved / total) * 100}%` : '0%' }}
+          transition={{ duration: 1, ease: [0.2, 0.7, 0.2, 1] }}
+        />
       </div>
     </div>
   );
@@ -211,7 +234,7 @@ function Stat({ label, values, decimals = 0 }: { label: string; values: PerDivis
 function DivisionTag({ division }: { division: Division }) {
   return (
     <span
-      className={`eyebrow px-2 py-0.5 text-[13px] ${
+      className={`eyebrow shrink-0 px-2 py-0.5 text-[13px] ${
         division === 'Local' ? 'bg-cyan text-bg' : 'border border-cyan text-cyan'
       }`}
     >
@@ -233,20 +256,20 @@ function SolveFeed({ solves }: { solves: Solve[] }) {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0 }}
               transition={{ type: 'spring', stiffness: 260, damping: 30 }}
-              className={`flex h-[66px] shrink-0 items-center gap-4 border-l-4 px-4 ${
+              className={`flex h-[82px] shrink-0 flex-col justify-center gap-1 border-l-4 px-4 ${
                 s.blood ? 'border-red bg-red/15' : 'border-cyan/60 bg-bg/60'
               }`}
             >
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-3">
-                  <span className="truncate font-display text-2xl font-semibold">{s.teamName}</span>
-                  <DivisionTag division={s.division} />
-                </div>
-                <div className="truncate text-lg text-fg-muted">
-                  {s.challenge} <span className="text-fg-muted/60">· {s.category}</span>
-                </div>
+              <div className="flex items-baseline gap-3">
+                <span className="min-w-0 flex-1 truncate font-display text-2xl font-semibold">{s.teamName}</span>
+                <span className="font-display text-xl text-fg-muted">{fmtClock(s.time)}</span>
               </div>
-              <span className="font-display text-xl text-fg-muted tabular-nums">{fmtClock(s.time)}</span>
+              <div className="flex items-center gap-3">
+                <DivisionTag division={s.division} />
+                <span className="min-w-0 truncate text-lg text-fg-muted">
+                  {s.challenge} <span className="text-fg-muted/60">· {s.category}</span>
+                </span>
+              </div>
             </motion.li>
           ))}
         </AnimatePresence>

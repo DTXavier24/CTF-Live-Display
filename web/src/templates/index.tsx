@@ -3,6 +3,7 @@
 import type { NowPlaying, TemplateId, TemplatePayloads } from '@iboh/shared';
 import { motion } from 'motion/react';
 import type { FC } from 'react';
+import { Mono } from '../CountUp';
 import { fmtDuration, useNow } from '../server';
 import { Top10 } from './Top10';
 
@@ -27,7 +28,7 @@ function Countdown({ item }: TemplateProps<'countdown-start' | 'countdown-end'>)
   return (
     <div className="flex h-full flex-col items-center justify-center">
       <p className="eyebrow text-2xl text-fg-muted">{label}</p>
-      <p className="glitch mt-4 font-display text-[150px] leading-none font-bold tabular-nums">{fmtDuration(target - now)}</p>
+      <p className="glitch mt-4 font-display text-[150px] leading-none font-bold"><Mono text={fmtDuration(target - now)} /></p>
     </div>
   );
 }

@@ -6,7 +6,7 @@ import { kv } from './db.js';
 import type { GzctfSource } from './gzctf/source.js';
 import type { TemplateContext } from './templates.js';
 
-const FEED_SIZE = 10;
+const FEED_SIZE = 8;
 const RATE_WINDOW_MS = 5 * 60_000;
 const POLL_MS = 10_000;
 

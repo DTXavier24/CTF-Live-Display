@@ -63,7 +63,7 @@ export interface DisplayState {
   phase: Phase;
   game: Game | null;
   scoreboard: Omit<Scoreboard, 'solves'>;
-  /** Latest solves, newest first, capped at 10. */
+  /** Latest solves, newest first, capped at 8. */
   solves: Solve[];
   stats: Stats;
   /** GZCTF unreachable: showing last-known data. */
