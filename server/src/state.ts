@@ -1,4 +1,4 @@
-import type { ClientToServerEvents, DisplayState, Division, Game, NowPlaying, Phase, ServerToClientEvents, Solve } from '@iboh/shared';
+import type { ClientToServerEvents, DisplayState, Division, Game, NowPlaying, Phase, PhaseOverride, ServerToClientEvents, Solve } from '@iboh/shared';
 import type { FastifyBaseLogger } from 'fastify';
 import type { Server } from 'socket.io';
 import { config } from './config.js';
@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { kv } from './db.js';
 import type { Detectors } from './detectors.js';
 import type { GzctfSource } from './gzctf/source.js';
+import { listMedia, mediaUrl } from './media.js';
 import type { TemplateContext } from './templates.js';
 
 const FEED_SIZE = 8;
@@ -22,7 +23,20 @@ function buildId() {
   }
 }
 
+/** Admin settings that the display reads. */
+export const settings = {
+  phaseOverride: kv.get<PhaseOverride>('phaseOverride') ?? 'auto',
+  venue: kv.get<string>('venue') ?? 'the main hall',
+};
+export function saveSettings(next: Partial<typeof settings>) {
+  Object.assign(settings, next);
+  kv.set('phaseOverride', settings.phaseOverride);
+  kv.set('venue', settings.venue);
+}
+
+/** Phase from the game clock, unless the admin overrides it. */
 export function phaseAt(game: Game | null, now: number): Phase {
+  if (settings.phaseOverride !== 'auto') return settings.phaseOverride;
   if (!game || now < game.start) return 'pre';
   return now < game.end ? 'live' : 'ended';
 }
@@ -44,6 +58,8 @@ export function startState(
   let dataDelayed = true; // until the first successful fetch
   let lastPhase: Phase | null = null;
   let getNow: () => NowPlaying | null = () => null;
+  let lastFetchOk: number | null = null;
+  let lastFetchError: string | null = null;
 
   function snapshot(): DisplayState {
     const now = Date.now();
@@ -66,6 +82,8 @@ export function startState(
       mock: config.mock,
       now: getNow(),
       buildId: buildId(),
+      venue: settings.venue,
+      logos: listMedia('logos').map((f) => mediaUrl('logos', f)),
     };
   }
 
@@ -120,8 +138,11 @@ export function startState(
       kv.set('game', game);
       kv.set('scoreboard', scoreboard);
       dataDelayed = false;
+      lastFetchOk = Date.now();
+      lastFetchError = null;
     } catch (err) {
       dataDelayed = true;
+      lastFetchError = err instanceof Error ? err.message : String(err);
       log.warn({ err }, 'GZCTF poll failed, keeping last-known data');
     }
     push();
@@ -139,6 +160,8 @@ export function startState(
   return {
     push,
     refresh: poll,
+    game: () => game,
+    health: () => ({ lastFetchOk, lastFetchError }),
     context: (): TemplateContext => ({ game, scoreboard, phase: phaseAt(game, Date.now()), now: Date.now(), solves: detectors.solves() }),
     setNowPlaying(fn: () => NowPlaying | null) {
       getNow = fn;

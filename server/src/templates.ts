@@ -1,11 +1,10 @@
 // Template registry: one entry per event type. The queue engine only talks to this shape,
 // so a new event type is a new entry here + a component in web/src/templates/.
 import type { DisplayState, Division, Game, Phase, Priority, ScoreRow, Solve, TemplateId, TemplatePayloads, Top10Board } from '@iboh/shared';
-import { existsSync, mkdirSync, readdirSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import { kv } from './db.js';
 import { autoConfig } from './detectors.js';
+import { listMedia, mediaExists, mediaUrl } from './media.js';
 
 export interface TemplateContext {
   game: Game | null;
@@ -26,9 +25,6 @@ interface TemplateDef<K extends TemplateId> {
   resolve(input: any, ctx: TemplateContext): TemplatePayloads[K] | null;
 }
 
-export const VIDEO_DIR = fileURLToPath(new URL('../../data/media/videos/', import.meta.url));
-mkdirSync(VIDEO_DIR, { recursive: true });
-const VIDEO_FILE = /^[\w.-]+\.(mp4|webm)$/i;
 let videoTurn = 0;
 
 const DIVISIONS: Division[] = ['Local', 'International'];
@@ -94,15 +90,15 @@ export const templates: { [K in TemplateId]: TemplateDef<K> } = {
     },
   },
   'sponsor-video': {
-    input: z.object({ file: z.string().regex(VIDEO_FILE).optional() }),
+    input: z.object({ file: z.string().max(120).optional() }),
     priority: 'normal',
     durationMs: null,
     resolve: (input: { file?: string }) => {
-      if (input.file) return existsSync(VIDEO_DIR + input.file) ? { url: `/media/videos/${encodeURIComponent(input.file)}` } : null;
+      if (input.file) return mediaExists('videos', input.file) ? { url: mediaUrl('videos', input.file) } : null;
       // No file chosen (loop entry): rotate through every uploaded video.
-      const files = readdirSync(VIDEO_DIR).filter((f) => VIDEO_FILE.test(f)).sort();
+      const files = listMedia('videos');
       if (!files.length) return null;
-      return { url: `/media/videos/${encodeURIComponent(files[videoTurn++ % files.length]!)}` };
+      return { url: mediaUrl('videos', files[videoTurn++ % files.length]!) };
     },
   },
   blood: {

@@ -1,4 +1,4 @@
-import type { ClientToServerEvents, LoopConfig, LoopEntry, NowPlaying, QueueItem, ServerToClientEvents } from '@iboh/shared';
+import type { ClientToServerEvents, DisplayInfo, LoopConfig, LoopEntry, NowPlaying, QueueItem, ServerToClientEvents } from '@iboh/shared';
 import type { FastifyBaseLogger } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import type { Server } from 'socket.io';
@@ -68,8 +68,8 @@ export function startEngine({ io, log, context, onChange }: EngineDeps) {
   let currentItem: QueueItem | null = null;
   let timer: ReturnType<typeof setTimeout> | undefined;
   /** Display sockets and whether each is visible. */
-  const displays = new Map<string, boolean>();
-  const watching = () => [...displays.values()].some(Boolean);
+  const displays = new Map<string, DisplayInfo>();
+  const watching = () => [...displays.values()].some((d) => d.visible);
   let skips = 0;
 
   function save() {
@@ -162,7 +162,7 @@ export function startEngine({ io, log, context, onChange }: EngineDeps) {
       finish();
     } else if (status === 'error') {
       failedBy.add(displayId);
-      const visible = [...displays].filter(([, v]) => v).map(([id]) => id);
+      const visible = [...displays.values()].filter((d) => d.visible).map((d) => d.id);
       // One broken or outdated screen must not cut the item for the others.
       if (visible.every((id) => failedBy.has(id))) {
         log.warn({ template: current.template, error }, 'every display reported an error, skipped');
@@ -176,11 +176,12 @@ export function startEngine({ io, log, context, onChange }: EngineDeps) {
   io.on('connection', (socket) => {
     if (socket.handshake.auth?.role !== 'display') return;
     const who = { address: socket.handshake.address, ua: socket.handshake.headers['user-agent'] };
-    displays.set(socket.id, socket.handshake.auth?.visible !== false);
-    log.info({ ...who, visible: displays.get(socket.id), displays: displays.size }, 'display connected');
+    const info: DisplayInfo = { id: socket.id, address: who.address, ua: who.ua ?? '', visible: socket.handshake.auth?.visible !== false, connectedAt: Date.now() };
+    displays.set(socket.id, info);
+    log.info({ ...who, visible: info.visible, displays: displays.size }, 'display connected');
     socket.on('report', (r) => onReport(r, socket.id));
     socket.on('visibility', (visible) => {
-      displays.set(socket.id, visible === true);
+      info.visible = visible === true;
       if (visible === true && !current) advance();
     });
     socket.on('disconnect', () => {
@@ -194,7 +195,32 @@ export function startEngine({ io, log, context, onChange }: EngineDeps) {
 
   return {
     now: () => current,
-    snapshot: () => ({ now: current, queue, loop, displays: displays.size, visibleDisplays: [...displays.values()].filter(Boolean).length }),
+    snapshot: () => ({ now: current, queue, loop, displays: displays.size, visibleDisplays: [...displays.values()].filter((d) => d.visible).length }),
+    displays: () => [...displays.values()],
+    queue: () => queue,
+    loop: (): LoopConfig => ({ enabled: loop.enabled, entries: loop.entries }),
+    /** Admin drag-to-reorder: the given ids in order; anything not listed keeps its place at the end. */
+    reorder(ids: string[]) {
+      const byId = new Map(queue.map((q) => [q.id, q]));
+      const picked = ids.map((id) => byId.get(id)).filter((q) => q !== undefined);
+      queue = [...picked, ...queue.filter((q) => !ids.includes(q.id))];
+      save();
+    },
+    update(id: string, patch: { durationMs?: number | null; priority?: QueueItem['priority'] }) {
+      const item = queue.find((q) => q.id === id);
+      if (!item) return false;
+      if (patch.durationMs !== undefined) item.durationMs = patch.durationMs ?? undefined;
+      if (patch.priority && patch.priority !== item.priority) {
+        // Re-file under the new priority: a high item goes after the existing highs.
+        item.priority = patch.priority;
+        queue = queue.filter((q) => q !== item);
+        const at = item.priority === 'high' ? queue.findIndex((q) => q.priority !== 'high') : -1;
+        if (at === -1) queue.push(item);
+        else queue.splice(at, 0, item);
+      }
+      save();
+      return true;
+    },
     add(body: z.infer<typeof QueueAdd>): QueueItem {
       const item: QueueItem = {
         id: randomUUID(),

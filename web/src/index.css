@@ -58,3 +58,102 @@ body {
 @keyframes ticker {
   to { transform: translateX(-50%); }
 }
+
+/* ---------- Admin panel ----------
+ * An operator console, not a broadcast surface: normal responsive layout, same tokens.
+ * In the components layer so Tailwind utilities (w-20, etc.) can override these.
+ */
+@layer components {
+  .admin {
+    background: var(--color-bg);
+    color: var(--color-fg);
+    font-size: 15px;
+  }
+  .card {
+    border: 1px solid var(--color-hair);
+    background: var(--color-bg-2);
+    padding: 1.25rem;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0.5rem 0.9rem;
+    font-family: var(--font-display);
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    border: 1px solid transparent;
+    transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+  }
+  .btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .btn-primary {
+    background: var(--color-cyan);
+    color: var(--color-bg);
+  }
+  .btn-primary:not(:disabled):hover {
+    background: var(--color-fg);
+  }
+  .btn-red {
+    background: var(--color-red);
+    color: var(--color-bg);
+  }
+  .btn-red:not(:disabled):hover {
+    background: var(--color-fg);
+  }
+  .btn-ghost {
+    border-color: var(--color-hair);
+    color: var(--color-fg);
+  }
+  .btn-ghost:not(:disabled):hover {
+    border-color: var(--color-cyan);
+    color: var(--color-cyan);
+  }
+  .chip {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+  }
+  .chip-ok { background: rgba(72, 224, 224, 0.15); color: var(--color-cyan); }
+  .chip-warn { background: rgba(240, 180, 60, 0.15); color: #f0b43c; }
+  .chip-bad { background: rgba(240, 92, 85, 0.15); color: var(--color-red); }
+  .chip-muted { background: var(--color-hair); color: var(--color-fg-muted); }
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+  .field > span {
+    font-size: 13px;
+    color: var(--color-fg-muted);
+  }
+  .input,
+  .field input,
+  .field select,
+  .field textarea {
+    width: 100%;
+    background: var(--color-bg);
+    border: 1px solid var(--color-hair);
+    color: var(--color-fg);
+    padding: 0.45rem 0.6rem;
+    font: inherit;
+    font-size: 14px;
+  }
+  .input:focus,
+  .field input:focus,
+  .field select:focus,
+  .field textarea:focus {
+    outline: none;
+    border-color: var(--color-cyan);
+  }
+  .admin :focus-visible {
+    outline: 2px solid var(--color-cyan);
+    outline-offset: 2px;
+  }
+}

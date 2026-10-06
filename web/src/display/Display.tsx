@@ -8,9 +8,6 @@ import { Featured, isFullscreen } from './Featured';
 import { Stage } from '../Stage';
 import { fmtClock, fmtDuration, useNow, useServerState } from '../server';
 
-// ponytail: hardcoded until the admin venue field (phase 5).
-const VENUE = 'the main hall';
-
 export function Display() {
   const { state, connected } = useServerState();
   const delayed = !state || !connected || state.dataDelayed;
@@ -32,7 +29,7 @@ export function Display() {
           ) : state.phase === 'live' ? (
             <LiveView state={state} delayed={delayed} />
           ) : (
-            <EndedView />
+            <EndedView venue={state.venue} />
           )}
         </motion.div>
       </AnimatePresence>
@@ -93,19 +90,19 @@ function PreView({ state }: { state: DisplayState }) {
           </p>
         </div>
       </div>
-      <Ticker />
+      <Ticker logos={state.logos} />
     </div>
   );
 }
 
-function EndedView() {
+function EndedView({ venue }: { venue: string }) {
   return (
     <div className="flex h-full flex-col items-center justify-center px-40 text-center">
       <img src="/brand/logo_with_text.png" alt="" className="max-h-[180px]" />
       <h1 className="glitch mt-16 font-display text-[88px] leading-tight font-bold uppercase">
         IBOH 2026 has officially ended.
       </h1>
-      <p className="mt-8 font-display text-5xl text-cyan">Please proceed to {VENUE}.</p>
+      <p className="mt-8 font-display text-5xl text-cyan">Please proceed to {venue}.</p>
     </div>
   );
 }
@@ -137,7 +134,7 @@ function LiveView({ state, delayed }: { state: DisplayState; delayed: boolean })
         </Boundary>
       </div>
       <Boundary name="ticker">
-        <Ticker />
+        <Ticker logos={state.logos} />
       </Boundary>
     </div>
   );
@@ -280,13 +277,19 @@ function SolveFeed({ solves }: { solves: Solve[] }) {
   );
 }
 
-// ponytail: brand text until sponsor logo uploads (phase 5).
-function Ticker() {
-  const items = Array.from({ length: 8 }, (_, i) => (
-    <span key={i} className="eyebrow mx-12 text-xl text-fg-muted">
-      International Battle of Hackers 2026 <span className="mx-12 text-cyan">◆</span>
-    </span>
-  ));
+/** Sponsor logos on a seamless loop; brand text until logos are uploaded. */
+function Ticker({ logos }: { logos: string[] }) {
+  // Repeat short lists so one copy is always wider than the screen (the loop needs two copies to seam).
+  const reps = logos.length ? Math.max(1, Math.ceil(8 / logos.length)) : 8;
+  const items = Array.from({ length: reps }, (_, r) =>
+    logos.length ? (
+      logos.map((src) => <img key={`${r}-${src}`} src={src} alt="" className="mx-14 h-14 max-w-[260px] object-contain" />)
+    ) : (
+      <span key={r} className="eyebrow mx-12 text-xl text-fg-muted">
+        International Battle of Hackers 2026 <span className="mx-12 text-cyan">◆</span>
+      </span>
+    ),
+  );
   return (
     <footer className="flex items-center overflow-hidden border-t border-line bg-bg-2/80">
       <div className="ticker flex shrink-0 whitespace-nowrap">

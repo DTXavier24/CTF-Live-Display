@@ -74,6 +74,10 @@ export interface DisplayState {
   now: NowPlaying | null;
   /** Identifies the served frontend build; a display on an older build reloads itself. Null in dev. */
   buildId: string | null;
+  /** Where to send people after the event (admin setting). */
+  venue: string;
+  /** Sponsor logo URLs for the ticker. */
+  logos: string[];
 }
 
 export interface ServerToClientEvents {
@@ -179,4 +183,44 @@ export interface ClientToServerEvents {
   report: (r: { id: string; status: ReportStatus; error?: string }) => void;
   /** Hidden tabs don't animate, so they can't play items: only visible displays count as watching. */
   visibility: (visible: boolean) => void;
+}
+
+// ---------- Admin ----------
+
+export type PhaseOverride = 'auto' | Phase;
+
+export interface DisplayInfo {
+  id: string;
+  address: string;
+  ua: string;
+  visible: boolean;
+  connectedAt: number;
+}
+
+export interface LogEntry {
+  time: number;
+  level: 'warn' | 'error';
+  msg: string;
+}
+
+export interface AdminState {
+  now: NowPlaying | null;
+  queue: QueueItem[];
+  loop: LoopConfig;
+  displays: DisplayInfo[];
+  autoConfig: AutoConfig;
+  game: Game | null;
+  phase: Phase;
+  phaseOverride: PhaseOverride;
+  venue: string;
+  media: { videos: string[]; logos: string[] };
+  health: {
+    source: 'mock' | 'gzctf';
+    /** SignalR hub state, or 'n/a' in mock mode. */
+    hub: string;
+    lastFetchOk: number | null;
+    lastFetchError: string | null;
+    errors: LogEntry[];
+  };
+  serverTime: number;
 }

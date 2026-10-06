@@ -113,5 +113,6 @@ export function createGzctfClient(cfg: GzctfConfig, log: FastifyBaseLogger): Gzc
     onSolve(cb) {
       listeners.push(cb);
     },
+    hubState: () => hub.state,
   };
 }

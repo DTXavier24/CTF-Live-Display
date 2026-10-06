@@ -5,4 +5,6 @@ export interface GzctfSource {
   getGame(): Promise<Game>;
   getScoreboard(): Promise<Scoreboard>;
   onSolve(cb: (solve: Solve) => void): void;
+  /** Real-time channel state for the health panel (SignalR hub). Absent in mock mode. */
+  hubState?(): string;
 }

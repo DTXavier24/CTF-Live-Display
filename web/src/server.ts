@@ -4,7 +4,8 @@ import { io, type Socket } from 'socket.io-client';
 
 // One socket per page. Socket.IO reconnects forever with exponential backoff by default.
 // Only the display drives the queue engine (and counts as someone watching).
-const isDisplay = location.pathname.startsWith('/display') || location.pathname === '/';
+// The admin's preview iframe (?preview=1) watches as a viewer: it must not drive the engine.
+const isDisplay = (location.pathname.startsWith('/display') || location.pathname === '/') && !new URLSearchParams(location.search).has('preview');
 const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io({
   // A function, so every reconnect sends the current visibility.
   auth: (cb) => cb({ role: isDisplay ? 'display' : 'viewer', visible: document.visibilityState === 'visible' }),

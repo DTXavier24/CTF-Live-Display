@@ -10,6 +10,7 @@ export default defineConfig(({ mode }) => {
       proxy: {
         '/socket.io': { target: `http://localhost:${env.PORT || 3000}`, ws: true },
         '/media': `http://localhost:${env.PORT || 3000}`,
+        '/api': `http://localhost:${env.PORT || 3000}`,
       },
     },
   };
