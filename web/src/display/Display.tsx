@@ -246,7 +246,7 @@ function DivisionTag({ division }: { division: Division }) {
 function SolveFeed({ solves }: { solves: Solve[] }) {
   return (
     <Panel title="Latest solves">
-      <ul className="flex flex-col gap-2 overflow-hidden">
+      <ul className="flex h-full flex-col gap-2 overflow-hidden">
         <AnimatePresence initial={false}>
           {solves.map((s) => (
             <motion.li
@@ -256,8 +256,8 @@ function SolveFeed({ solves }: { solves: Solve[] }) {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0 }}
               transition={{ type: 'spring', stiffness: 260, damping: 30 }}
-              className={`flex h-[82px] shrink-0 flex-col justify-center gap-1 border-l-4 px-4 ${
-                s.blood ? 'border-red bg-red/15' : 'border-cyan/60 bg-bg/60'
+              className={`flex h-[82px] shrink-0 flex-col justify-center gap-1 px-4 ${
+                s.blood ? 'bg-red/20' : 'bg-bg/60'
               }`}
             >
               <div className="flex items-baseline gap-3">
