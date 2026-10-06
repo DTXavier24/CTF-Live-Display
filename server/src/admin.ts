@@ -100,6 +100,8 @@ export async function registerAdmin(app: FastifyInstance, { engine, state, detec
         phase: phaseAt(game, Date.now()),
         phaseOverride: settings.phaseOverride,
         venue: settings.venue,
+        finalStretch: settings.finalStretch,
+        finalHour: state.mode().finalHour,
         media: { videos: listMedia('videos'), logos: listMedia('logos') },
         health: {
           source: mock ? 'mock' : 'gzctf',
@@ -156,7 +158,18 @@ export async function registerAdmin(app: FastifyInstance, { engine, state, detec
     // Phase override and settings
     admin.put('/api/admin/settings', async (req, reply) => {
       const body = z
-        .object({ venue: z.string().trim().min(1).max(120).optional(), phaseOverride: z.enum(['auto', 'pre', 'live', 'ended']).optional() })
+        .object({
+          venue: z.string().trim().min(1).max(120).optional(),
+          phaseOverride: z.enum(['auto', 'pre', 'live', 'ended']).optional(),
+          finalStretch: z
+            .object({
+              finalHour: z.enum(['auto', 'on', 'off']),
+              finalHourMin: z.number().min(1).max(600),
+              finalCountdown: z.boolean(),
+              endedTop10: z.boolean(),
+            })
+            .optional(),
+        })
         .safeParse(req.body);
       if (!body.success) return bad(reply, body.error);
       saveSettings(body.data);
@@ -189,10 +202,11 @@ export async function registerAdmin(app: FastifyInstance, { engine, state, detec
     // Rehearsal only: create the condition for an auto-event and skip its threshold/cooldown once.
     admin.post('/api/admin/mock/trigger', async (req, reply) => {
       if (!mock) return reply.code(404).send({ error: 'mock mode only' });
-      const body = z.object({ kind: z.enum(['blood', 'takeover', 'wall-falls', 'on-fire', 'milestone']) }).safeParse(req.body);
+      const body = z.object({ kind: z.enum(['blood', 'takeover', 'wall-falls', 'on-fire', 'milestone', 'extend-end']) }).safeParse(req.body);
       if (!body.success) return bad(reply, body.error);
-      if (body.data.kind !== 'blood') detectors.force(body.data.kind);
-      const result = mock.trigger(body.data.kind);
+      const kind = body.data.kind;
+      if (kind !== 'blood' && kind !== 'extend-end') detectors.force(kind);
+      const result = mock.trigger(kind);
       await state.refresh(); // takeover is detected from the scoreboard: don't wait for the next poll
       return { result };
     });

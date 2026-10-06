@@ -1,4 +1,4 @@
-import type { ClientToServerEvents, DisplayState, Division, Game, NowPlaying, Phase, PhaseOverride, ServerToClientEvents, Solve } from '@iboh/shared';
+import type { ClientToServerEvents, DisplayState, Division, FinalStretch, Game, NowPlaying, Phase, PhaseOverride, ServerToClientEvents, Solve } from '@iboh/shared';
 import type { FastifyBaseLogger } from 'fastify';
 import type { Server } from 'socket.io';
 import { config } from './config.js';
@@ -13,6 +13,10 @@ import type { TemplateContext } from './templates.js';
 const FEED_SIZE = 8;
 const RATE_WINDOW_MS = 5 * 60_000;
 const POLL_MS = 10_000;
+/** In the last minutes, poll fast so an extended end time cancels the countdown in time. */
+const FAST_POLL_MS = 2000;
+const FAST_POLL_WINDOW_MS = 2 * 60_000;
+const COUNTDOWN_MS = 10_000;
 
 /** mtime of the built index.html: changes on every redeploy, stable across restarts. */
 function buildId() {
@@ -24,15 +28,33 @@ function buildId() {
 }
 
 /** Admin settings that the display reads. */
+const FINAL_DEFAULTS: FinalStretch = { finalHour: 'auto', finalHourMin: 60, finalCountdown: true, endedTop10: true };
 export const settings = {
   phaseOverride: kv.get<PhaseOverride>('phaseOverride') ?? 'auto',
   venue: kv.get<string>('venue') ?? 'the main hall',
+  finalStretch: { ...FINAL_DEFAULTS, ...kv.get<Partial<FinalStretch>>('finalStretch') },
 };
 export function saveSettings(next: Partial<typeof settings>) {
   Object.assign(settings, next);
   kv.set('phaseOverride', settings.phaseOverride);
   kv.set('venue', settings.venue);
+  kv.set('finalStretch', settings.finalStretch);
 }
+
+/** Everything about "what the screen is in" that can flip on the clock alone. */
+export function modeAt(game: Game | null, now: number) {
+  const phase = phaseAt(game, now);
+  const left = game ? game.end - now : Infinity;
+  const f = settings.finalStretch;
+  const live = phase === 'live';
+  return {
+    phase,
+    finalHour: live && f.finalHour !== 'off' && (f.finalHour === 'on' || (left > 0 && left <= f.finalHourMin * 60_000)),
+    // Only on the real clock: a manual phase override never triggers the end-of-game sequence.
+    countdown: live && f.finalCountdown && settings.phaseOverride === 'auto' && left > 0 && left <= COUNTDOWN_MS,
+  };
+}
+export type Mode = ReturnType<typeof modeAt>;
 
 /** Phase from the game clock, unless the admin overrides it. */
 export function phaseAt(game: Game | null, now: number): Phase {
@@ -56,7 +78,8 @@ export function startState(
   let primed = false;
   let recent: { time: number; division: Division }[] = [];
   let dataDelayed = true; // until the first successful fetch
-  let lastPhase: Phase | null = null;
+  let lastMode = '';
+  const modeListeners: ((mode: Mode) => void)[] = [];
   let getNow: () => NowPlaying | null = () => null;
   let lastFetchOk: number | null = null;
   let lastFetchError: string | null = null;
@@ -67,8 +90,9 @@ export function startState(
     const count = (d: Division) => scoreboard.entries.filter((e) => e.division === d);
     const sum = (d: Division) => count(d).reduce((n, e) => n + e.solvedCount, 0);
     const rate = (d: Division) => recent.filter((r) => r.division === d).length / (RATE_WINDOW_MS / 60_000);
+    const mode = modeAt(game, now);
     return {
-      phase: phaseAt(game, now),
+      phase: mode.phase,
       game,
       scoreboard,
       solves,
@@ -84,14 +108,13 @@ export function startState(
       buildId: buildId(),
       venue: settings.venue,
       logos: listMedia('logos').map((f) => mediaUrl('logos', f)),
+      finalHour: mode.finalHour,
+      finalCountdown: settings.finalStretch.finalCountdown && settings.phaseOverride === 'auto',
+      endedTop10: settings.finalStretch.endedTop10,
     };
   }
 
-  const push = () => {
-    const s = snapshot();
-    lastPhase = s.phase;
-    io.emit('state', s);
-  };
+  const push = () => io.emit('state', snapshot());
 
   /** Hub and scoreboard diff both land here; the shared id makes it once-only. */
   function addSolve(solve: Solve) {
@@ -148,12 +171,23 @@ export function startState(
     push();
   }
 
-  void poll();
-  setInterval(poll, POLL_MS);
-  // Push promptly when the phase flips at start/end, rather than waiting for the next poll.
+  // Poll on a chain so the interval can tighten near the end of the game.
+  async function pollLoop() {
+    await poll();
+    const left = game ? game.end - Date.now() : Infinity;
+    const near = phaseAt(game, Date.now()) === 'live' && left < FAST_POLL_WINDOW_MS && left > -5000;
+    setTimeout(pollLoop, near ? FAST_POLL_MS : POLL_MS);
+  }
+  void pollLoop();
+  // Phase, final hour and the countdown flip on the clock: check often, push only on change.
   setInterval(() => {
-    if (phaseAt(game, Date.now()) !== lastPhase) push();
-  }, 1000);
+    const mode = modeAt(game, Date.now());
+    const key = JSON.stringify(mode);
+    if (key === lastMode) return;
+    lastMode = key;
+    modeListeners.forEach((cb) => cb(mode));
+    push();
+  }, 250);
 
   io.on('connection', (socket) => socket.emit('state', snapshot()));
 
@@ -162,7 +196,14 @@ export function startState(
     refresh: poll,
     game: () => game,
     health: () => ({ lastFetchOk, lastFetchError }),
-    context: (): TemplateContext => ({ game, scoreboard, phase: phaseAt(game, Date.now()), now: Date.now(), solves: detectors.solves() }),
+    context: (): TemplateContext => {
+      const mode = modeAt(game, Date.now());
+      return { game, scoreboard, phase: mode.phase, paused: mode.countdown, now: Date.now(), solves: detectors.solves() };
+    },
+    mode: () => modeAt(game, Date.now()),
+    onModeChange(cb: (mode: Mode) => void) {
+      modeListeners.push(cb);
+    },
     setNowPlaying(fn: () => NowPlaying | null) {
       getNow = fn;
     },

@@ -4,6 +4,7 @@ import { api, Unauthorized } from './api';
 import {
   AddFromTemplate,
   AutoEvents,
+  FinalStretchCard,
   Health,
   LoopEditor,
   MediaLibrary,
@@ -78,6 +79,7 @@ export function Admin() {
           {state.phase.toUpperCase()}
           {state.phaseOverride !== 'auto' && ' (override)'}
         </span>
+        {state.finalHour && <span className="chip chip-bad">FINAL HOUR</span>}
         {state.health.source === 'mock' && <span className="chip chip-warn">MOCK DATA</span>}
         <a href="/display" target="_blank" rel="noreferrer" className="btn btn-ghost ml-auto">
           Open display ↗
@@ -97,6 +99,7 @@ export function Admin() {
         <div className="flex min-w-0 flex-col gap-5">
           <Health {...props} />
           <PhaseControl {...props} />
+          <FinalStretchCard {...props} />
           <LoopEditor {...props} />
           <AutoEvents {...props} />
           <Venue {...props} />

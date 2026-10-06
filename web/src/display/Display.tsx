@@ -1,36 +1,57 @@
 import type { DisplayState, Division, PerDivision, Solve } from '@iboh/shared';
 import { AnimatePresence, motion } from 'motion/react';
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Boundary } from '../Boundary';
 import { CountUp, Mono } from '../CountUp';
 import { ordinal } from '../templates/events';
 import { Featured, isFullscreen, Wipe } from './Featured';
+import { EndFlash, FinalCountdown, FinalHourIntro, FinalStandings, Top3Panel, usePastEnd } from './FinalStretch';
 import { Stage } from '../Stage';
 import { fmtClock, fmtDuration, useNow, useServerState } from '../server';
 
 export function Display() {
   const { state, connected } = useServerState();
   const delayed = !state || !connected || state.dataDelayed;
+  // With the countdown on, cut to ended at the exact end time instead of waiting for the server push.
+  const pastEnd = usePastEnd(state?.game?.end, !!state && state.phase === 'live' && state.finalCountdown);
+  const phase = pastEnd ? 'ended' : state?.phase;
+  const finalHour = !!state?.finalHour && phase === 'live';
+
+  // The hit at zero: one white burn over the cut into the closing statement.
+  const [flash, setFlash] = useState(false);
+  useEffect(() => {
+    if (!pastEnd) return;
+    setFlash(true);
+    const t = setTimeout(() => setFlash(false), 1700);
+    return () => clearTimeout(t);
+  }, [pastEnd]);
+
   return (
     <Stage>
-      <AnimatePresence mode="wait">
-        <motion.div key={state?.phase ?? 'boot'} className="absolute inset-0 overflow-hidden" exit={{ opacity: 0, transition: { duration: 0.2 } }}>
-          <Wipe duration={0.9}>
-            {!state ? (
-              <Splash />
-            ) : state.phase === 'pre' ? (
-              <PreView state={state} />
-            ) : state.phase === 'live' ? (
-              <LiveView state={state} delayed={delayed} />
-            ) : (
-              <EndedView venue={state.venue} />
-            )}
-          </Wipe>
-        </motion.div>
-      </AnimatePresence>
-      {state && <Overlay state={state} />}
-      {state && delayed && <DelayedBadge />}
-      <div className="scanlines" aria-hidden />
+      {/* Final hour swaps the accent token, so every cyan element shifts to alert orange at once. */}
+      <div className={finalHour ? 'final-hour absolute inset-0' : 'absolute inset-0'}>
+        <AnimatePresence mode="wait">
+          <motion.div key={phase ?? 'boot'} className="absolute inset-0 overflow-hidden" exit={{ opacity: 0, transition: { duration: 0.2 } }}>
+            <Wipe duration={0.9}>
+              {!state ? (
+                <Splash />
+              ) : phase === 'pre' ? (
+                <PreView state={state} />
+              ) : phase === 'live' ? (
+                <LiveView state={state} delayed={delayed} finalHour={finalHour} />
+              ) : (
+                <EndedView state={state} />
+              )}
+            </Wipe>
+          </motion.div>
+        </AnimatePresence>
+        {state && phase !== 'ended' && <Overlay state={state} />}
+        {state && delayed && <DelayedBadge />}
+        <FinalHourIntro on={finalHour} end={state?.game?.end} />
+        {state?.game && state.finalCountdown && <FinalCountdown end={state.game.end} />}
+        {flash && <EndFlash />}
+        <div className="scanlines" aria-hidden />
+      </div>
     </Stage>
   );
 }
@@ -93,29 +114,44 @@ function PreView({ state }: { state: DisplayState }) {
   );
 }
 
-function EndedView({ venue }: { venue: string }) {
+function EndedView({ state }: { state: DisplayState }) {
+  const standings = state.endedTop10 && state.scoreboard.entries.length > 0;
   return (
-    <div className="flex h-full flex-col items-center justify-center px-40 text-center">
-      <img src="/brand/logo_with_text.png" alt="" className="max-h-[180px]" />
-      <h1 className="glitch hit mt-16 font-display text-[96px] leading-tight font-bold uppercase" style={{ animationDelay: '0.5s' }}>
+    <div className={`flex h-full flex-col items-center px-40 text-center ${standings ? 'justify-start pt-24' : 'justify-center'}`}>
+      <img src="/brand/logo_with_text.png" alt="" className={standings ? 'max-h-[120px]' : 'max-h-[180px]'} />
+      <h1
+        className={`glitch hit font-display leading-tight font-bold uppercase ${standings ? 'mt-10 text-[76px]' : 'mt-16 text-[96px]'}`}
+        style={{ animationDelay: '0.5s' }}
+      >
         IBOH 2026 has officially ended.
       </h1>
-      <p className="extend mt-10" style={{ animationDelay: '0.9s' }}>
-        <span className="plate plate-cyan px-6 py-3 text-5xl normal-case">Please proceed to {venue}.</span>
+      <p className={`extend ${standings ? 'mt-6' : 'mt-10'}`} style={{ animationDelay: '0.9s' }}>
+        <span className={`plate plate-cyan px-6 py-3 normal-case ${standings ? 'text-4xl' : 'text-5xl'}`}>Please proceed to {state.venue}.</span>
       </p>
+      {standings && (
+        <motion.div className="mt-14 text-left" initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.4, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}>
+          <FinalStandings entries={state.scoreboard.entries} />
+        </motion.div>
+      )}
     </div>
   );
 }
 
-function LiveView({ state, delayed }: { state: DisplayState; delayed: boolean }) {
+function LiveView({ state, delayed, finalHour }: { state: DisplayState; delayed: boolean; finalHour: boolean }) {
   return (
     <div className="grid h-full grid-rows-[120px_1fr_96px]">
       <Boundary name="top">
-        <TopBar state={state} delayed={delayed} />
+        <TopBar state={state} delayed={delayed} finalHour={finalHour} />
       </Boundary>
       <div className="grid min-h-0 grid-cols-[360px_1fr_460px] gap-6 px-8 py-6">
         <Boundary name="stats">
-          <StatsPanel state={state} />
+          {finalHour ? (
+            <Panel title="Top 3">
+              <Top3Panel state={state} />
+            </Panel>
+          ) : (
+            <StatsPanel state={state} />
+          )}
         </Boundary>
         <Boundary name="center">
           <Panel>
@@ -134,14 +170,15 @@ function LiveView({ state, delayed }: { state: DisplayState; delayed: boolean })
         </Boundary>
       </div>
       <Boundary name="ticker">
-        <Ticker logos={state.logos} />
+        <Ticker logos={state.logos} fast={finalHour} />
       </Boundary>
     </div>
   );
 }
 
-function TopBar({ state, delayed }: { state: DisplayState; delayed: boolean }) {
+function TopBar({ state, delayed, finalHour }: { state: DisplayState; delayed: boolean; finalHour: boolean }) {
   const now = useNow();
+  const left = state.game ? state.game.end - now : 0;
   return (
     <header className="relative flex items-center justify-between border-b-2 border-cyan/40 bg-bg-2/90 px-8">
       <div className="flex w-[440px] items-center gap-4">
@@ -154,8 +191,12 @@ function TopBar({ state, delayed }: { state: DisplayState; delayed: boolean }) {
           <br />
           remaining
         </span>
-        <span className="font-display text-[84px] leading-none font-bold">
-          <Mono text={state.game ? fmtDuration(state.game.end - now) : '--:--:--'} />
+        {/* Final hour: bigger, and it pulses as each minute ticks over (the key change replays the pulse). */}
+        <span
+          key={finalHour ? Math.ceil(left / 60_000) : 'steady'}
+          className={`font-display leading-none font-bold ${finalHour ? 'minute-pulse text-[104px] text-red' : 'text-[84px]'}`}
+        >
+          <Mono text={state.game ? fmtDuration(left) : '--:--:--'} />
         </span>
       </div>
       <div className="flex w-[440px] items-center justify-end gap-6">
@@ -299,7 +340,7 @@ function TickerMark() {
 }
 
 /** Sponsor logos on a seamless loop; brand text until logos are uploaded. */
-function Ticker({ logos }: { logos: string[] }) {
+function Ticker({ logos, fast = false }: { logos: string[]; fast?: boolean }) {
   // Repeat short lists so one copy is always wider than the screen (the loop needs two copies to seam).
   const reps = logos.length ? Math.max(1, Math.ceil(8 / logos.length)) : 8;
   const items = Array.from({ length: reps }, (_, r) =>
@@ -314,7 +355,7 @@ function Ticker({ logos }: { logos: string[] }) {
   );
   return (
     <footer className="flex items-center overflow-hidden border-t-2 border-cyan/40 bg-bg-2/90">
-      <div className="ticker flex shrink-0 whitespace-nowrap">
+      <div className={`ticker flex shrink-0 whitespace-nowrap ${fast ? 'ticker-fast' : ''}`}>
         <div className="flex">{items}</div>
         <div className="flex">{items}</div>
       </div>

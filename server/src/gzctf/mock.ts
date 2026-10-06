@@ -35,11 +35,11 @@ function weighted<T>(xs: T[], weight: (x: T) => number): T {
   return xs[xs.length - 1]!;
 }
 
-export type MockTrigger = AutoEventKind | 'blood';
+export type MockTrigger = AutoEventKind | 'blood' | 'extend-end';
 
 export function createMockSource(): GzctfSource & { trigger(kind: MockTrigger): string } {
   const start = Date.now() - config.mockStartOffsetMin * 60_000;
-  const end = start + config.mockDurationMin * 60_000;
+  let end = start + config.mockDurationMin * 60_000;
 
   const teams: MockTeam[] = Array.from({ length: 48 }, (_, i) => ({
     id: i + 1,
@@ -106,6 +106,11 @@ export function createMockSource(): GzctfSource & { trigger(kind: MockTrigger): 
   /** Rehearsal: make the condition for an auto-event true right now. Returns what happened. */
   function trigger(kind: MockTrigger): string {
     const now = Date.now();
+    if (kind === 'extend-end') {
+      // Rehearse an admin extending the game in GZCTF, e.g. during the final countdown.
+      end = Math.max(end, now) + 5 * 60_000;
+      return `game end extended to ${new Date(end).toLocaleTimeString('en-GB', { timeZone: 'Asia/Kuala_Lumpur' })} GMT+8`;
+    }
     if (kind === 'blood') {
       // A challenge where some division still has a blood slot open, solved by a team in that division.
       for (const chal of [...challenges].sort(() => Math.random() - 0.5)) {

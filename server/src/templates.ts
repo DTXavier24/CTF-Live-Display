@@ -10,6 +10,8 @@ export interface TemplateContext {
   game: Game | null;
   scoreboard: DisplayState['scoreboard'];
   phase: Phase;
+  /** The final countdown owns the screen: nothing else may start. */
+  paused: boolean;
   now: number;
   /** Every known solve, oldest first. */
   solves: Solve[];

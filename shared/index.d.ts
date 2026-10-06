@@ -78,6 +78,20 @@ export interface DisplayState {
   venue: string;
   /** Sponsor logo URLs for the ticker. */
   logos: string[];
+  /** Final hour mode: alert palette, top 3 per division, bigger timer. */
+  finalHour: boolean;
+  /** Whether the 10-second countdown runs at the end (the display times it against the server clock). */
+  finalCountdown: boolean;
+  /** Ended page also alternates the final Top 10 of each division. */
+  endedTop10: boolean;
+}
+
+export interface FinalStretch {
+  finalHour: 'auto' | 'on' | 'off';
+  /** Auto mode turns final hour on this many minutes before the end. */
+  finalHourMin: number;
+  finalCountdown: boolean;
+  endedTop10: boolean;
 }
 
 export interface ServerToClientEvents {
@@ -218,6 +232,8 @@ export interface AdminState {
   phase: Phase;
   phaseOverride: PhaseOverride;
   venue: string;
+  finalStretch: FinalStretch;
+  finalHour: boolean;
   media: { videos: string[]; logos: string[] };
   health: {
     source: 'mock' | 'gzctf';

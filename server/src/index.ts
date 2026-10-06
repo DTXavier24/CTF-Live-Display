@@ -64,6 +64,7 @@ const detectors = createDetectors({
 const state = startState(source, io, app.log, detectors);
 engine = startEngine({ io, log: app.log, context: state.context, onChange: state.push });
 state.setNowPlaying(engine.now);
+state.onModeChange((mode) => engine?.setPaused(mode.countdown));
 
 await registerAdmin(app, { engine, state, detectors, source, mock, recentErrors });
 

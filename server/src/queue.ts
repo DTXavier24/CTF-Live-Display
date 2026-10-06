@@ -95,7 +95,7 @@ export function startEngine({ io, log, context, onChange }: EngineDeps) {
     clearTimeout(timer);
     const ctx = context();
     // Queue plays over pre and live; the loop only during live. Nothing without a display watching.
-    const canQueue = watching() && ctx.phase !== 'ended';
+    const canQueue = watching() && ctx.phase !== 'ended' && !ctx.paused;
     const canLoop = canQueue && ctx.phase === 'live' && loop.enabled && loop.entries.length > 0;
 
     let item: QueueItem;
@@ -199,6 +199,20 @@ export function startEngine({ io, log, context, onChange }: EngineDeps) {
     displays: () => [...displays.values()],
     queue: () => queue,
     loop: (): LoopConfig => ({ enabled: loop.enabled, entries: loop.entries }),
+    /**
+     * The final countdown is the one thing that interrupts: stop the current item (a queue item
+     * goes back to the front so it isn't lost) and hold until the countdown ends or is cancelled.
+     */
+    setPaused(paused: boolean) {
+      if (paused && current) {
+        log.info({ template: current.template }, 'final countdown: interrupting current item');
+        clearTimeout(timer);
+        if (current.source === 'queue' && currentItem) queue.unshift(currentItem);
+        idle();
+      } else if (!paused && !current) {
+        advance();
+      }
+    },
     /** Admin drag-to-reorder: the given ids in order; anything not listed keeps its place at the end. */
     reorder(ids: string[]) {
       const byId = new Map(queue.map((q) => [q.id, q]));

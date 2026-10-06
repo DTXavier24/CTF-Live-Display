@@ -1,4 +1,4 @@
-import type { AutoConfig, AutoEventKind, AutoTemplate, LoopEntry, NowPlaying, PhaseOverride, QueueItem, TemplateId, TemplatePayloads } from '@iboh/shared';
+import type { AutoConfig, AutoEventKind, AutoTemplate, FinalStretch, LoopEntry, NowPlaying, PhaseOverride, QueueItem, TemplateId, TemplatePayloads } from '@iboh/shared';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { fmtClock, fmtDuration, serverNow, useNow } from '../server';
 import { templateComponents } from '../templates';
@@ -512,6 +512,54 @@ export function PhaseControl({ state, run }: PanelProps) {
   );
 }
 
+// ---------- Final stretch ----------
+
+export function FinalStretchCard({ state, run }: PanelProps) {
+  const [draft, setDraft] = useState<FinalStretch | null>(null);
+  const f = draft ?? state.finalStretch;
+  const set = (next: Partial<FinalStretch>) => setDraft({ ...f, ...next });
+  const names = { auto: 'Auto', on: 'On now', off: 'Off' } as const;
+  return (
+    <Card
+      title="Final stretch"
+      actions={
+        draft && (
+          <button className="btn btn-primary" onClick={() => run(() => api('PUT', '/api/admin/settings', { finalStretch: draft }), 'Final stretch saved').then((ok) => ok && setDraft(null))}>
+            Save
+          </button>
+        )
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <div>
+          <p className="mb-2 text-sm">
+            Final hour mode{' '}
+            <span className={`chip ${state.finalHour ? 'chip-bad' : 'chip-muted'}`}>{state.finalHour ? 'ACTIVE' : 'inactive'}</span>
+          </p>
+          <div className="flex flex-wrap items-end gap-2">
+            {(['auto', 'on', 'off'] as const).map((m) => (
+              <button key={m} className={`btn ${f.finalHour === m ? 'btn-primary' : 'btn-ghost'}`} onClick={() => set({ finalHour: m })}>
+                {names[m]}
+              </button>
+            ))}
+            <div className="ml-2 w-56">
+              <NumberField label="Auto starts before the end" suffix="min" min={1} value={f.finalHourMin} onChange={(finalHourMin) => set({ finalHourMin })} />
+            </div>
+          </div>
+          <p className="mt-1 text-xs text-fg-muted">Alert colors, top 3 per division in place of live stats, bigger timer, faster ticker.</p>
+        </div>
+        <Toggle checked={f.finalCountdown} onChange={(finalCountdown) => set({ finalCountdown })}>
+          Full-screen 10-second countdown at the end (interrupts whatever is playing)
+        </Toggle>
+        <Toggle checked={f.endedTop10} onChange={(endedTop10) => set({ endedTop10 })}>
+          Show the final Top 10 of each division on the ended page
+        </Toggle>
+        {draft && <p className="text-xs text-red">Unsaved changes.</p>}
+      </div>
+    </Card>
+  );
+}
+
 // ---------- Settings: venue and media ----------
 
 export function Venue({ state, run }: PanelProps) {
@@ -642,12 +690,13 @@ export function Health({ state }: PanelProps) {
 
 export function MockTriggers({ run }: PanelProps) {
   const [last, setLast] = useState('');
-  const kinds: [AutoEventKind | 'blood', string][] = [
+  const kinds: [AutoEventKind | 'blood' | 'extend-end', string][] = [
     ['blood', 'Blood'],
     ['takeover', 'Takeover'],
     ['wall-falls', 'Wall Falls'],
     ['on-fire', 'On Fire'],
     ['milestone', 'Milestone'],
+    ['extend-end', 'Extend end +5 min'],
   ];
   return (
     <Card title="Rehearsal (mock only)">
