@@ -8,7 +8,9 @@ import { Server } from 'socket.io';
 import { config } from './config.js';
 import { createGzctfClient } from './gzctf/client.js';
 import { createMockSource } from './gzctf/mock.js';
-import { LoopUpdate, QueueAdd, startEngine } from './queue.js';
+import { AutoConfigSchema, autoConfig, createDetectors, setAutoConfig } from './detectors.js';
+import { LoopUpdate, QueueAdd, startEngine, type Engine } from './queue.js';
+import { z } from 'zod';
 import { startState } from './state.js';
 import { VIDEO_DIR } from './templates.js';
 
@@ -27,8 +29,21 @@ if (existsSync(webDist)) {
   app.get('/admin', (_req, reply) => reply.sendFile('index.html'));
 }
 
-const state = startState(config.gzctf ? createGzctfClient(config.gzctf, app.log) : createMockSource(), io, app.log);
-const engine = startEngine({ io, log: app.log, context: state.context, onChange: state.push });
+const mock = config.gzctf ? null : createMockSource();
+let engine: Engine | undefined;
+const detectors = createDetectors({
+  log: app.log,
+  queue: (template, input) => {
+    try {
+      engine?.add({ template, input });
+      app.log.info({ template }, 'auto-event queued');
+    } catch (err) {
+      app.log.error({ err, template }, 'auto-event rejected');
+    }
+  },
+});
+const state = startState(config.gzctf ? createGzctfClient(config.gzctf, app.log) : mock!, io, app.log, detectors);
+engine = startEngine({ io, log: app.log, context: state.context, onChange: state.push });
 state.setNowPlaying(engine.now);
 
 // ---------- Admin API ----------
@@ -43,23 +58,40 @@ async function requireAdmin(req: FastifyRequest, reply: FastifyReply) {
 
 app.register(async (admin) => {
   admin.addHook('preHandler', requireAdmin);
-  admin.get('/api/admin/queue', async () => engine.snapshot());
+  admin.get('/api/admin/queue', async () => engine!.snapshot());
   admin.post('/api/admin/queue', async (req, reply) => {
     const body = QueueAdd.safeParse(req.body);
     if (!body.success) return reply.code(400).send({ error: body.error.flatten() });
-    return engine.add(body.data);
+    return engine!.add(body.data);
   });
   admin.delete<{ Params: { id: string } }>('/api/admin/queue/:id', async (req, reply) =>
-    engine.remove(req.params.id) ? { ok: true } : reply.code(404).send({ error: 'not found' }),
+    engine!.remove(req.params.id) ? { ok: true } : reply.code(404).send({ error: 'not found' }),
   );
   admin.post('/api/admin/skip', async () => {
-    engine.skip();
+    engine!.skip();
     return { ok: true };
+  });
+  admin.get('/api/admin/auto-events', async () => autoConfig());
+  admin.put('/api/admin/auto-events', async (req, reply) => {
+    const body = AutoConfigSchema.safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: body.error.flatten() });
+    setAutoConfig(body.data);
+    return autoConfig();
+  });
+  // Rehearsal only: create the condition for an auto-event and skip its threshold/cooldown once.
+  admin.post('/api/admin/mock/trigger', async (req, reply) => {
+    if (!mock) return reply.code(404).send({ error: 'mock mode only' });
+    const body = z.object({ kind: z.enum(['blood', 'takeover', 'wall-falls', 'on-fire', 'milestone']) }).safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: body.error.flatten() });
+    if (body.data.kind !== 'blood') detectors.force(body.data.kind);
+    const result = mock.trigger(body.data.kind);
+    await state.refresh(); // takeover is detected from the scoreboard: don't wait for the next poll
+    return { result };
   });
   admin.put('/api/admin/loop', async (req, reply) => {
     const body = LoopUpdate.safeParse(req.body);
     if (!body.success) return reply.code(400).send({ error: body.error.flatten() });
-    engine.setLoop(body.data);
+    engine!.setLoop(body.data);
     return { ok: true };
   });
 });

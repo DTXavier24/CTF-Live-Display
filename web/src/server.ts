@@ -16,9 +16,13 @@ export const report = (id: string, status: ReportStatus, error?: string) => sock
 
 let clockOffset = 0;
 let lastState: DisplayState | null = null;
+let firstBuild: string | null | undefined;
 socket.on('state', (s) => {
   clockOffset = s.serverTime - Date.now();
   lastState = s;
+  // The server was redeployed with a new frontend: pick it up, or a hotfix never reaches the kiosk.
+  if (firstBuild === undefined) firstBuild = s.buildId;
+  else if (s.buildId && s.buildId !== firstBuild) location.reload();
 });
 
 /** The backend clock, so every screen counts down in sync with the server. */

@@ -72,6 +72,8 @@ export interface DisplayState {
   mock: boolean;
   /** Current featured item (center panel, or full screen for takeovers). */
   now: NowPlaying | null;
+  /** Identifies the served frontend build; a display on an older build reloads itself. Null in dev. */
+  buildId: string | null;
 }
 
 export interface ServerToClientEvents {
@@ -107,6 +109,32 @@ export interface TemplatePayloads {
   top10: { boards: Top10Board[] };
   unsolved: { categories: { category: string; challenges: string[] }[]; total: number };
   'sponsor-video': { url: string };
+  blood: { rank: 1 | 2 | 3; division: Division; team: string; player: string; challenge: string; category: string; time: number };
+  takeover: { division: Division; leader: { name: string; score: number }; dethroned: { name: string; score: number }; gap: number };
+  'wall-falls': { challenge: string; category: string; stoodMs: number; team: string; player: string; division: Division };
+  'on-fire': { team: string; division: Division; count: number; challenges: string[] };
+  milestone: { milestone: number; team: string; player: string; division: Division };
+  spotlight: {
+    name: string;
+    division: Division;
+    rank: number;
+    score: number;
+    solvedCount: number;
+    topCategory: string | null;
+    players: string[];
+  };
+}
+
+export type AutoEventKind = 'takeover' | 'wall-falls' | 'on-fire' | 'milestone';
+
+export interface AutoConfig {
+  bloods: boolean;
+  takeover: { enabled: boolean; cooldownMin: number };
+  wallFalls: { enabled: boolean; hours: number };
+  onFire: { enabled: boolean; count: number; windowMin: number; cooldownMin: number };
+  milestone: { enabled: boolean; list: number[] };
+  /** Auto-events detected longer ago than this are dropped at play time. */
+  staleMin: number;
 }
 export type TemplateId = keyof TemplatePayloads;
 

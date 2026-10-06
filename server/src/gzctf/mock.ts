@@ -1,4 +1,4 @@
-import type { Challenge, Division, ScoreEntry, Solve } from '@iboh/shared';
+import type { AutoEventKind, Challenge, Division, ScoreEntry, Solve } from '@iboh/shared';
 import { config } from '../config.js';
 import type { GzctfSource } from './source.js';
 
@@ -35,7 +35,9 @@ function weighted<T>(xs: T[], weight: (x: T) => number): T {
   return xs[xs.length - 1]!;
 }
 
-export function createMockSource(): GzctfSource {
+export type MockTrigger = AutoEventKind | 'blood';
+
+export function createMockSource(): GzctfSource & { trigger(kind: MockTrigger): string } {
   const start = Date.now() - config.mockStartOffsetMin * 60_000;
   const end = start + config.mockDurationMin * 60_000;
 
@@ -62,6 +64,10 @@ export function createMockSource(): GzctfSource {
     const team = weighted(candidates, (t) => t.skill);
     const open = challenges.filter((c) => !team.solved.has(c.id));
     const chal = weighted(open, (c) => (HARD.has(c.title) ? 0.002 : 1) / c.points ** 2);
+    return solveAs(team, chal, time);
+  }
+
+  function solveAs(team: MockTeam, chal: (typeof challenges)[number], time: number): Solve {
     const solve: Solve = {
       id: `${team.id}-${chal.id}`,
       teamId: team.id,
@@ -87,11 +93,65 @@ export function createMockSource(): GzctfSource {
     const now = Date.now();
     if (now >= start && now < end) {
       const solve = simulateSolve(now);
-      if (solve) listeners.forEach((cb) => cb(solve));
+      if (solve) emit(solve);
     }
     setTimeout(tick, interval * (0.5 + Math.random()));
   }
-  tick();
+  setTimeout(tick, interval); // deferred: emit is declared below
+
+  const emit = (s: Solve) => listeners.forEach((cb) => cb(s));
+  const scoreOf = (t: MockTeam) => [...t.solved.keys()].reduce((n, id) => n + challenges.find((c) => c.id === id)!.points, 0);
+  const openFor = (t: MockTeam) => challenges.filter((c) => !t.solved.has(c.id));
+
+  /** Rehearsal: make the condition for an auto-event true right now. Returns what happened. */
+  function trigger(kind: MockTrigger): string {
+    const now = Date.now();
+    if (kind === 'blood') {
+      // A challenge where some division still has a blood slot open, solved by a team in that division.
+      for (const chal of [...challenges].sort(() => Math.random() - 0.5)) {
+        for (const division of ['Local', 'International'] as Division[]) {
+          const inDiv = teams.filter((t) => t.division === division);
+          const solvers = inDiv.filter((t) => t.solved.has(chal.id)).length;
+          const team = inDiv.find((t) => !t.solved.has(chal.id));
+          if (solvers < 3 && team) {
+            emit(solveAs(team, chal, now));
+            return `${team.name} (${division}) solved ${chal.title}: blood #${solvers + 1}`;
+          }
+        }
+      }
+      return 'no open blood slots left';
+    }
+    if (kind === 'takeover') {
+      const division: Division = Math.random() < 0.5 ? 'Local' : 'International';
+      const ranked = teams.filter((t) => t.division === division).sort((a, b) => scoreOf(b) - scoreOf(a));
+      const [first, second] = ranked;
+      if (!first || !second) return 'not enough teams';
+      // The runner-up solves its cheapest open challenges until it passes the leader.
+      for (const chal of openFor(second).sort((a, b) => a.points - b.points)) {
+        if (scoreOf(second) > scoreOf(first)) break;
+        emit(solveAs(second, chal, Date.now()));
+      }
+      return scoreOf(second) > scoreOf(first) ? `${second.name} overtook ${first.name} in ${division}` : `${second.name} could not pass ${first.name}`;
+    }
+    if (kind === 'wall-falls') {
+      const chal = challenges.find((c) => !teams.some((t) => t.solved.has(c.id)));
+      if (!chal) return 'every challenge already has a solve';
+      const team = pick(teams);
+      emit(solveAs(team, chal, now));
+      return `${team.name} made the first solve on ${chal.title}`;
+    }
+    if (kind === 'on-fire') {
+      const team = pick(teams.filter((t) => openFor(t).length >= 3));
+      if (!team) return 'no team has 3 challenges left';
+      const picks = openFor(team).sort((a, b) => a.points - b.points).slice(0, 3);
+      picks.forEach((chal, i) => emit(solveAs(team, chal, now - (2 - i) * 1000)));
+      return `${team.name} solved 3 in a row`;
+    }
+    // milestone: any solve; the detector treats the next solve as the milestone.
+    const solve = simulateSolve(now);
+    if (solve) emit(solve);
+    return solve ? `${solve.teamName} captured the next flag` : 'nothing left to solve';
+  }
 
   // Skill drift so ranks keep changing.
   setInterval(() => {
@@ -134,5 +194,6 @@ export function createMockSource(): GzctfSource {
     onSolve(cb) {
       listeners.push(cb);
     },
+    trigger,
   };
 }

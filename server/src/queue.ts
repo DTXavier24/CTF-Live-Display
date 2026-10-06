@@ -13,7 +13,14 @@ const IDLE_RETRY_MS = 5000;
 
 const DEFAULT_LOOP: LoopConfig = {
   enabled: true,
-  entries: [{ template: 'top10' }, { template: 'sponsor-video' }, { template: 'unsolved' }, { template: 'sponsor-video' }, { template: 'countdown-end' }],
+  entries: [
+    { template: 'top10' },
+    { template: 'sponsor-video' },
+    { template: 'unsolved' },
+    { template: 'spotlight' },
+    { template: 'sponsor-video' },
+    { template: 'countdown-end' },
+  ],
 };
 
 const Template = z.enum(templateIds as [string, ...string[]]);
@@ -56,6 +63,8 @@ export function startEngine({ io, log, context, onChange }: EngineDeps) {
   if (interrupted) queue.unshift(interrupted);
 
   let current: NowPlaying | null = null;
+  /** Displays that failed the current item. It is skipped only once every visible display has failed it. */
+  let failedBy = new Set<string>();
   let currentItem: QueueItem | null = null;
   let timer: ReturnType<typeof setTimeout> | undefined;
   /** Display sockets and whether each is visible. */
@@ -127,6 +136,7 @@ export function startEngine({ io, log, context, onChange }: EngineDeps) {
     }
     const durationMs = item.durationMs ?? (typeof def.durationMs === 'function' ? (def.durationMs as (p: unknown) => number | null)(payload) : def.durationMs);
     current = { id: randomUUID(), template: item.template, payload, durationMs, status: 'loading', startedAt: null, source } as NowPlaying;
+    failedBy = new Set();
     currentItem = item;
     skips = 0;
     save();
@@ -138,7 +148,7 @@ export function startEngine({ io, log, context, onChange }: EngineDeps) {
     return true;
   }
 
-  function onReport(raw: unknown) {
+  function onReport(raw: unknown, displayId: string) {
     const r = Report.safeParse(raw);
     if (!r.success || !current || r.data.id !== current.id) return;
     const { status, error } = r.data;
@@ -151,8 +161,15 @@ export function startEngine({ io, log, context, onChange }: EngineDeps) {
     } else if (status === 'done' && current.status === 'playing') {
       finish();
     } else if (status === 'error') {
-      log.warn({ template: current.template, error }, 'display reported an error, skipped');
-      finish();
+      failedBy.add(displayId);
+      const visible = [...displays].filter(([, v]) => v).map(([id]) => id);
+      // One broken or outdated screen must not cut the item for the others.
+      if (visible.every((id) => failedBy.has(id))) {
+        log.warn({ template: current.template, error }, 'every display reported an error, skipped');
+        finish();
+      } else {
+        log.warn({ template: current.template, error, displayId }, 'one display failed the item; others continue');
+      }
     }
   }
 
@@ -161,7 +178,7 @@ export function startEngine({ io, log, context, onChange }: EngineDeps) {
     const who = { address: socket.handshake.address, ua: socket.handshake.headers['user-agent'] };
     displays.set(socket.id, socket.handshake.auth?.visible !== false);
     log.info({ ...who, visible: displays.get(socket.id), displays: displays.size }, 'display connected');
-    socket.on('report', onReport);
+    socket.on('report', (r) => onReport(r, socket.id));
     socket.on('visibility', (visible) => {
       displays.set(socket.id, visible === true);
       if (visible === true && !current) advance();

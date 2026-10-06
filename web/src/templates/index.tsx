@@ -5,6 +5,7 @@ import { motion } from 'motion/react';
 import type { FC } from 'react';
 import { Mono } from '../CountUp';
 import { fmtDuration, useNow } from '../server';
+import { Blood, Milestone, OnFire, Spotlight, Takeover, WallFalls } from './events';
 import { Top10 } from './Top10';
 
 export interface TemplateProps<K extends TemplateId> {
@@ -99,4 +100,10 @@ export const templateComponents: Record<TemplateId, TemplateEntry> = {
   top10: { component: Top10 },
   unsolved: { component: Unsolved },
   'sponsor-video': { component: SponsorVideo, waitsForMedia: true },
+  blood: { component: Blood },
+  takeover: { component: Takeover },
+  'wall-falls': { component: WallFalls },
+  'on-fire': { component: OnFire },
+  milestone: { component: Milestone },
+  spotlight: { component: Spotlight },
 };

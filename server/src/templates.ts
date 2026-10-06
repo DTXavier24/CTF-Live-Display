@@ -1,16 +1,19 @@
 // Template registry: one entry per event type. The queue engine only talks to this shape,
 // so a new event type is a new entry here + a component in web/src/templates/.
-import type { DisplayState, Division, Game, Phase, Priority, ScoreRow, TemplateId, TemplatePayloads, Top10Board } from '@iboh/shared';
+import type { DisplayState, Division, Game, Phase, Priority, ScoreRow, Solve, TemplateId, TemplatePayloads, Top10Board } from '@iboh/shared';
 import { existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import { kv } from './db.js';
+import { autoConfig } from './detectors.js';
 
 export interface TemplateContext {
   game: Game | null;
   scoreboard: DisplayState['scoreboard'];
   phase: Phase;
   now: number;
+  /** Every known solve, oldest first. */
+  solves: Solve[];
 }
 
 interface TemplateDef<K extends TemplateId> {
@@ -29,6 +32,13 @@ const VIDEO_FILE = /^[\w.-]+\.(mp4|webm)$/i;
 let videoTurn = 0;
 
 const DIVISIONS: Division[] = ['Local', 'International'];
+const Div = z.enum(['Local', 'International']);
+const name = z.string().max(200);
+
+/** Auto-events carry when they were detected; too old by play time = skip rather than show stale news. */
+const fresh = (input: { detectedAt: number }, ctx: TemplateContext) => ctx.now - input.detectedAt <= autoConfig().staleMin * 60_000;
+type Detected<K extends TemplateId> = TemplatePayloads[K] & { detectedAt: number };
+const withoutDetectedAt = <T extends { detectedAt: number }>({ detectedAt: _, ...rest }: T) => rest;
 
 function top10Board(division: Division, ctx: TemplateContext): Top10Board | null {
   const all = ctx.scoreboard.entries.filter((e) => e.division === division);
@@ -95,6 +105,72 @@ export const templates: { [K in TemplateId]: TemplateDef<K> } = {
       return { url: `/media/videos/${encodeURIComponent(files[videoTurn++ % files.length]!)}` };
     },
   },
+  blood: {
+    input: z.object({ rank: z.union([z.literal(1), z.literal(2), z.literal(3)]), division: Div, team: name, player: name, challenge: name, category: name, time: z.number() }),
+    priority: 'high',
+    durationMs: 8_000,
+    // Every blood plays, even late in an opening rush: no staleness check.
+    resolve: (input: TemplatePayloads['blood']) => input,
+  },
+  takeover: {
+    input: z.object({
+      division: Div,
+      leader: z.object({ name, score: z.number(), teamId: z.number() }),
+      dethroned: z.object({ name, score: z.number() }),
+      gap: z.number(),
+      detectedAt: z.number(),
+    }),
+    priority: 'high',
+    durationMs: 10_000,
+    resolve: (input, ctx) => {
+      // Still true? The new leader must hold #1 right now.
+      const top = ctx.scoreboard.entries.find((e) => e.division === input.division && e.rank === 1);
+      if (!fresh(input, ctx) || !top || top.teamId !== input.leader.teamId) return null;
+      const dethroned = ctx.scoreboard.entries.find((e) => e.division === input.division && e.name === input.dethroned.name);
+      const dScore = dethroned?.score ?? input.dethroned.score;
+      return { division: input.division, leader: { name: top.name, score: top.score }, dethroned: { name: input.dethroned.name, score: dScore }, gap: top.score - dScore };
+    },
+  },
+  'wall-falls': {
+    input: z.object({ challenge: name, category: name, stoodMs: z.number(), team: name, player: name, division: Div, detectedAt: z.number() }),
+    priority: 'high',
+    durationMs: 10_000,
+    resolve: (input: Detected<'wall-falls'>, ctx) => (fresh(input, ctx) ? withoutDetectedAt(input) : null),
+  },
+  'on-fire': {
+    input: z.object({ team: name, division: Div, count: z.number().int(), challenges: z.array(name).max(50), detectedAt: z.number() }),
+    priority: 'normal',
+    durationMs: 8_000,
+    resolve: (input: Detected<'on-fire'>, ctx) => (fresh(input, ctx) ? withoutDetectedAt(input) : null),
+  },
+  milestone: {
+    input: z.object({ milestone: z.number().int(), team: name, player: name, division: Div, detectedAt: z.number() }),
+    priority: 'normal',
+    durationMs: 8_000,
+    resolve: (input: Detected<'milestone'>, ctx) => (fresh(input, ctx) ? withoutDetectedAt(input) : null),
+  },
+  spotlight: {
+    input: z.object({}),
+    priority: 'normal',
+    durationMs: 12_000,
+    resolve: (_, ctx) => spotlight(ctx),
+  },
 };
 
 export const templateIds = Object.keys(templates) as TemplateId[];
+
+function spotlight(ctx: TemplateContext): TemplatePayloads['spotlight'] | null {
+  const recent = kv.get<number[]>('spotlight:recent') ?? [];
+  const eligible = ctx.scoreboard.entries.filter((e) => e.solvedCount > 0 && !recent.includes(e.teamId));
+  // Prefer teams that the top 10 boards never show.
+  const pool = eligible.some((e) => e.rank > 10) ? eligible.filter((e) => e.rank > 10) : eligible;
+  const team = pool[Math.floor(Math.random() * pool.length)];
+  if (!team) return null;
+  kv.set('spotlight:recent', [team.teamId, ...recent].slice(0, 10));
+  const own = ctx.solves.filter((s) => s.teamId === team.teamId);
+  const perCat = new Map<string, number>();
+  for (const s of own) perCat.set(s.category, (perCat.get(s.category) ?? 0) + 1);
+  const topCategory = [...perCat].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+  const players = [...new Set(own.map((s) => s.player).filter(Boolean))];
+  return { name: team.name, division: team.division, rank: team.rank, score: team.score, solvedCount: team.solvedCount, topCategory, players };
+}

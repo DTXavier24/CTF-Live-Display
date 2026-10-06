@@ -79,6 +79,8 @@ export function createGzctfClient(cfg: GzctfConfig, log: FastifyBaseLogger): Gzc
     const solve = adaptSubmission(parsed.data, lastBoard);
     if (solve) listeners.forEach((cb) => cb(solve));
   });
+  // Game events (notices, container events) aren't used; handled so SignalR doesn't warn on each one.
+  hub.on('ReceivedGameEvent', () => {});
   hub.onreconnecting(() => {
     log.warn('GZCTF hub disconnected; scoreboard polling covers solves until it reconnects');
     // The session cookie may be what expired: refresh it before the next attempt.

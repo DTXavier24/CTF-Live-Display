@@ -2,7 +2,10 @@ import type { ClientToServerEvents, DisplayState, Division, Game, NowPlaying, Ph
 import type { FastifyBaseLogger } from 'fastify';
 import type { Server } from 'socket.io';
 import { config } from './config.js';
+import { statSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { kv } from './db.js';
+import type { Detectors } from './detectors.js';
 import type { GzctfSource } from './gzctf/source.js';
 import type { TemplateContext } from './templates.js';
 
@@ -10,12 +13,26 @@ const FEED_SIZE = 8;
 const RATE_WINDOW_MS = 5 * 60_000;
 const POLL_MS = 10_000;
 
+/** mtime of the built index.html: changes on every redeploy, stable across restarts. */
+function buildId() {
+  try {
+    return String(statSync(fileURLToPath(new URL('../../web/dist/index.html', import.meta.url))).mtimeMs);
+  } catch {
+    return null; // dev: Vite serves the page and hot-reloads it
+  }
+}
+
 export function phaseAt(game: Game | null, now: number): Phase {
   if (!game || now < game.start) return 'pre';
   return now < game.end ? 'live' : 'ended';
 }
 
-export function startState(source: GzctfSource, io: Server<ClientToServerEvents, ServerToClientEvents>, log: FastifyBaseLogger) {
+export function startState(
+  source: GzctfSource,
+  io: Server<ClientToServerEvents, ServerToClientEvents>,
+  log: FastifyBaseLogger,
+  detectors: Detectors,
+) {
   // Last-known data survives restarts: stale over blank.
   let game = kv.get<Game>('game') ?? null;
   let scoreboard = kv.get<DisplayState['scoreboard']>('scoreboard') ?? { entries: [], challenges: [] };
@@ -48,6 +65,7 @@ export function startState(source: GzctfSource, io: Server<ClientToServerEvents,
       serverTime: now,
       mock: config.mock,
       now: getNow(),
+      buildId: buildId(),
     };
   }
 
@@ -61,6 +79,8 @@ export function startState(source: GzctfSource, io: Server<ClientToServerEvents,
   function addSolve(solve: Solve) {
     if (seen.has(solve.id)) return false;
     seen.add(solve.id);
+    // Detectors queue bloods/streaks/milestones and tell us the blood rank for the feed highlight.
+    solve = { ...solve, blood: detectors.onSolve(solve) };
     solves = [solve, ...solves].sort((a, b) => b.time - a.time).slice(0, FEED_SIZE);
     recent.push({ time: solve.time, division: solve.division });
     return true;
@@ -75,12 +95,17 @@ export function startState(source: GzctfSource, io: Server<ClientToServerEvents,
   function syncHistory(history: Solve[]) {
     if (!primed) {
       // Boot: everything so far is history, not news. Seed an empty feed so it's never blank.
+      detectors.prime(history);
       if (!solves.length) solves = [...history].sort((a, b) => b.time - a.time).slice(0, FEED_SIZE);
+      solves = solves.map((s) => ({ ...s, blood: detectors.bloodOf(s) }));
       history.forEach((s) => seen.add(s.id));
       primed = true;
     } else {
       // Anything the hub missed (disconnected, or unknown team at the time).
-      history.filter((s) => !seen.has(s.id)).forEach(addSolve);
+      history
+        .filter((s) => !seen.has(s.id))
+        .sort((a, b) => a.time - b.time)
+        .forEach(addSolve);
     }
     kv.set('solves', solves);
   }
@@ -91,6 +116,7 @@ export function startState(source: GzctfSource, io: Server<ClientToServerEvents,
       game = g;
       scoreboard = { entries: board.entries, challenges: board.challenges };
       syncHistory(board.solves);
+      detectors.onScoreboard(board.entries, board.challenges, game);
       kv.set('game', game);
       kv.set('scoreboard', scoreboard);
       dataDelayed = false;
@@ -112,7 +138,8 @@ export function startState(source: GzctfSource, io: Server<ClientToServerEvents,
 
   return {
     push,
-    context: (): TemplateContext => ({ game, scoreboard, phase: phaseAt(game, Date.now()), now: Date.now() }),
+    refresh: poll,
+    context: (): TemplateContext => ({ game, scoreboard, phase: phaseAt(game, Date.now()), now: Date.now(), solves: detectors.solves() }),
     setNowPlaying(fn: () => NowPlaying | null) {
       getNow = fn;
     },

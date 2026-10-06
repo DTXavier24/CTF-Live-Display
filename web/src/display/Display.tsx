@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import type { ReactNode } from 'react';
 import { Boundary } from '../Boundary';
 import { CountUp, Mono } from '../CountUp';
+import { ordinal } from '../templates/events';
 import { Featured, isFullscreen } from './Featured';
 import { Stage } from '../Stage';
 import { fmtClock, fmtDuration, useNow, useServerState } from '../server';
@@ -266,6 +267,7 @@ function SolveFeed({ solves }: { solves: Solve[] }) {
               </div>
               <div className="flex items-center gap-3">
                 <DivisionTag division={s.division} />
+                {s.blood && <span className="eyebrow shrink-0 text-[13px] text-red">{ordinal(s.blood)} blood</span>}
                 <span className="min-w-0 truncate text-lg text-fg-muted">
                   {s.challenge} <span className="text-fg-muted/60">· {s.category}</span>
                 </span>
