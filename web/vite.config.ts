@@ -7,6 +7,8 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react(), tailwindcss()],
     server: {
+      // Reachable from other devices on the LAN (e.g. a second screen for rehearsal).
+      host: true,
       proxy: {
         '/socket.io': { target: `http://localhost:${env.PORT || 3000}`, ws: true },
         '/media': `http://localhost:${env.PORT || 3000}`,
