@@ -160,13 +160,17 @@ export function startState(
 
   async function poll() {
     try {
-      const [g, board] = await Promise.all([source.getGame(), source.getScoreboard()]);
-      game = g;
-      scoreboard = { entries: board.entries, challenges: board.challenges };
-      syncHistory(board.solves);
-      detectors.onScoreboard(board.entries, board.challenges, game);
+      game = await source.getGame();
       kv.set('game', game);
-      kv.set('scoreboard', scoreboard);
+      // GZCTF refuses the scoreboard (HTTP 400) until the game starts. Before then the game times
+      // are all the display needs, so a refusal is not an outage.
+      const board = Date.now() < game.start ? await source.getScoreboard().catch(() => null) : await source.getScoreboard();
+      if (board) {
+        scoreboard = { entries: board.entries, challenges: board.challenges };
+        syncHistory(board.solves);
+        detectors.onScoreboard(board.entries, board.challenges, game);
+        kv.set('scoreboard', scoreboard);
+      }
       dataDelayed = false;
       lastFetchOk = Date.now();
       lastFetchError = null;

@@ -68,7 +68,7 @@ export function createGzctfClient(cfg: GzctfConfig, log: FastifyBaseLogger): Gzc
   };
   const hub = new HubConnectionBuilder()
     .withUrl(`${cfg.baseUrl}/hub/monitor?game=${cfg.gameId}`, { headers, skipNegotiation: true, transport: HttpTransportType.WebSockets })
-    .withAutomaticReconnect({ nextRetryDelayInMilliseconds: (ctx) => Math.min(30_000, 1000 * 2 ** ctx.previousRetryCount) })
+    .withAutomaticReconnect({ nextRetryDelayInMilliseconds: (ctx) => Math.min(10_000, 1000 * 2 ** ctx.previousRetryCount) })
     .configureLogging(hubLog)
     .build();
 
