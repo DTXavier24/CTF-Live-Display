@@ -100,7 +100,7 @@ function PreView({ state }: { state: DisplayState }) {
   return (
     <div className="grid h-full grid-rows-[1fr_96px]">
       <div className="flex items-center justify-center gap-24 px-24">
-        <img src="/brand/mascot_iboh%20(1).png" alt="" className="max-h-[640px] max-w-[560px] object-contain" />
+        <img src="/brand/mascot.png" alt="" className="max-h-[640px] max-w-[560px] object-contain" />
         <div className="flex flex-col items-start">
           <img src="/brand/logo_with_text.png" alt="" className="max-h-[200px]" />
           <p className="mt-10 font-display text-3xl font-semibold text-cyan">14 November 2026 · GMT+8</p>
