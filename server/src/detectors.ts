@@ -9,7 +9,7 @@ const DEFAULTS: AutoConfig = {
   bloods: true,
   takeover: { enabled: true, cooldownMin: 15 },
   wallFalls: { enabled: true, hours: 3 },
-  onFire: { enabled: true, count: 3, windowMin: 10, cooldownMin: 30 },
+  onFire: { enabled: true, count: 4, windowMin: 10, cooldownMin: 30 },
   milestone: { enabled: true, list: [100, 250, 500, 750, 1000] },
   staleMin: 5,
   durations: { blood: 8, takeover: 10, 'wall-falls': 10, 'on-fire': 8, milestone: 8 },

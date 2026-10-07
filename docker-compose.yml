@@ -1,0 +1,11 @@
+services:
+  display:
+    build: .
+    restart: unless-stopped # comes back by itself after a crash or a VPS reboot
+    env_file: .env
+    environment:
+      PORT: 3000 # inside the container; the host port is set below
+    ports:
+      - '80:3000' # http://<vps-ip>/display and /admin
+    volumes:
+      - ./data:/app/data

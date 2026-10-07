@@ -1,7 +1,10 @@
 import { Component, type ReactNode } from 'react';
 
-/** Per-panel error boundary: a crash hides that panel only, then retries after 5s. */
-export class Boundary extends Component<{ name: string; children: ReactNode; onError?: (err: unknown) => void }, { failed: boolean }> {
+/** Error boundary: a crash shows the fallback (nothing, for a panel) and retries after 5s. */
+export class Boundary extends Component<
+  { name: string; children: ReactNode; onError?: (err: unknown) => void; fallback?: ReactNode },
+  { failed: boolean }
+> {
   state = { failed: false };
   private retry?: ReturnType<typeof setTimeout>;
 
@@ -20,6 +23,6 @@ export class Boundary extends Component<{ name: string; children: ReactNode; onE
   }
 
   render() {
-    return this.state.failed ? null : this.props.children;
+    return this.state.failed ? (this.props.fallback ?? null) : this.props.children;
   }
 }

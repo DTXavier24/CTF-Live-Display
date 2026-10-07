@@ -28,30 +28,33 @@ export function Display() {
 
   return (
     <Stage>
-      {/* Final hour swaps the accent token, so every cyan element shifts to alert orange at once. */}
-      <div className={finalHour ? 'final-hour absolute inset-0' : 'absolute inset-0'}>
-        <AnimatePresence mode="wait">
-          <motion.div key={phase ?? 'boot'} className="absolute inset-0 overflow-hidden" exit={{ opacity: 0, transition: { duration: 0.2 } }}>
-            <Wipe duration={0.9}>
-              {!state ? (
-                <Splash />
-              ) : phase === 'pre' ? (
-                <PreView state={state} />
-              ) : phase === 'live' ? (
-                <LiveView state={state} delayed={delayed} finalHour={finalHour} />
-              ) : (
-                <EndedView state={state} />
-              )}
-            </Wipe>
-          </motion.div>
-        </AnimatePresence>
-        {state && phase !== 'ended' && <Overlay state={state} />}
-        {state && delayed && <DelayedBadge />}
-        <FinalHourIntro on={finalHour} end={state?.game?.end} />
-        {state?.game && state.finalCountdown && <FinalCountdown end={state.game.end} />}
-        {flash && <EndFlash />}
-        <div className="scanlines" aria-hidden />
-      </div>
+      {/* Last line of defence: anything outside a panel's own boundary falls back to the logo, never a blank screen. */}
+      <Boundary name="display" fallback={<Splash />}>
+        {/* Final hour swaps the accent token, so every cyan element shifts to alert orange at once. */}
+        <div className={finalHour ? 'final-hour absolute inset-0' : 'absolute inset-0'}>
+          <AnimatePresence mode="wait">
+            <motion.div key={phase ?? 'boot'} className="absolute inset-0 overflow-hidden" exit={{ opacity: 0, transition: { duration: 0.2 } }}>
+              <Wipe duration={0.9}>
+                {!state ? (
+                  <Splash />
+                ) : phase === 'pre' ? (
+                  <PreView state={state} />
+                ) : phase === 'live' ? (
+                  <LiveView state={state} delayed={delayed} finalHour={finalHour} />
+                ) : (
+                  <EndedView state={state} />
+                )}
+              </Wipe>
+            </motion.div>
+          </AnimatePresence>
+          {state && phase !== 'ended' && <Overlay state={state} />}
+          {state && delayed && <DelayedBadge />}
+          <FinalHourIntro on={finalHour} end={state?.game?.end} />
+          {state?.game && state.finalCountdown && <FinalCountdown end={state.game.end} />}
+          {flash && <EndFlash />}
+          <div className="scanlines" aria-hidden />
+        </div>
+      </Boundary>
     </Stage>
   );
 }

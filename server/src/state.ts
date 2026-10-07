@@ -127,10 +127,17 @@ export function startState(
     return true;
   }
 
+  // A live solve changes scores now; refresh the scoreboard shortly after so stats and the
+  // Top 10 keep up with the feed (at most every 2s during a rush) instead of waiting for the poll.
+  let refreshTimer: ReturnType<typeof setTimeout> | undefined;
   source.onSolve((solve) => {
     if (!addSolve(solve)) return;
     kv.set('solves', solves);
     push();
+    refreshTimer ??= setTimeout(() => {
+      refreshTimer = undefined;
+      void poll();
+    }, 2000);
   });
 
   function syncHistory(history: Solve[]) {
