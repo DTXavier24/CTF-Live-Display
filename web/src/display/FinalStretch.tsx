@@ -82,9 +82,9 @@ export function BigCountdown({ target, label, tone }: { target: number; label: s
               key={n}
               className={`glitch relative font-display leading-none font-bold tabular-nums ${n === 0 ? t.zero : 'text-fg'}`}
               style={{ fontSize: 560 }}
-              initial={{ scale: 1.6, opacity: 0, filter: 'blur(24px)' }}
-              animate={{ scale: 1, opacity: 1, filter: 'blur(0px)' }}
-              exit={{ scale: 0.7, opacity: 0, filter: 'blur(8px)', transition: { duration: 0.25 } }}
+              initial={{ scale: 1.6, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.7, opacity: 0, transition: { duration: 0.25 } }}
               transition={{ duration: 0.45, ease: EASE }}
             >
               {n}

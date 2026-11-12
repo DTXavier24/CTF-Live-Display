@@ -57,7 +57,7 @@ export function GameOn({ show }: { show: boolean }) {
           {/* The title card, on top of the closed doors. */}
           <motion.div
             className="absolute inset-0 flex flex-col items-center justify-center"
-            animate={{ opacity: [1, 1, 0], scale: [1, 1, 1.12], filter: ['blur(0px)', 'blur(0px)', 'blur(10px)'] }}
+            animate={{ opacity: [1, 1, 0], scale: [1, 1, 1.12] }}
             transition={{ duration: OPENING_S, times: [0, at(3.3), at(3.7)], ease: 'easeIn' }}
           >
             {/* Shockwaves out of the centre as the countdown hits zero. */}
@@ -79,8 +79,8 @@ export function GameOn({ show }: { show: boolean }) {
               src="/brand/logo_with_text.png"
               alt=""
               className="relative h-[220px]"
-              initial={{ scale: 1.8, opacity: 0, filter: 'blur(24px)' }}
-              animate={{ scale: 1, opacity: 1, filter: 'blur(0px)' }}
+              initial={{ scale: 1.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.15, duration: 0.65, ease: EASE }}
             />
             <p className="glitch hit relative mt-10 font-display text-[128px] leading-none font-bold uppercase" style={{ animationDelay: '0.55s' }}>

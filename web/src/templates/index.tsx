@@ -108,8 +108,8 @@ function Idle() {
         src="/brand/logo_with_text.png"
         alt="Battle of Hackers"
         className="max-h-[360px] max-w-[80%] object-contain"
-        initial={{ opacity: 0, scale: 1.08, filter: 'blur(14px)' }}
-        animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+        initial={{ opacity: 0, scale: 1.08 }}
+        animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 0.4, duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
       />
     </div>
