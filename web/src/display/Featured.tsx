@@ -58,7 +58,7 @@ function Item({ now }: { now: NowPlaying }) {
   const entry = templateComponents[now.template];
   useEffect(() => {
     if (!entry) report(now.id, 'error', `no component for template ${now.template}`);
-    else if (!entry.waitsForMedia) report(now.id, 'ready');
+    else report(now.id, 'ready');
   }, [now.id]);
   if (!entry) return null;
   const Component = entry.component;

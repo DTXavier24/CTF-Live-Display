@@ -4,7 +4,6 @@ import type { DisplayState, Division, Game, Phase, Priority, ScoreRow, Solve, Te
 import { z } from 'zod';
 import { kv } from './db.js';
 import { autoConfig } from './detectors.js';
-import { listMedia, mediaExists, mediaUrl } from './media.js';
 
 export interface TemplateContext {
   game: Game | null;
@@ -27,7 +26,6 @@ interface TemplateDef<K extends TemplateId> {
   resolve(input: any, ctx: TemplateContext): TemplatePayloads[K] | null;
 }
 
-let videoTurn = 0;
 
 const DIVISIONS: Division[] = ['Local', 'International'];
 const Div = z.enum(['Local', 'International']);
@@ -89,18 +87,6 @@ export const templates: { [K in TemplateId]: TemplateDef<K> } = {
       if (!byCat.size) return null;
       const categories = [...byCat].map(([category, challenges]) => ({ category, challenges }));
       return { categories, total: categories.reduce((n, c) => n + c.challenges.length, 0) };
-    },
-  },
-  'sponsor-video': {
-    input: z.object({ file: z.string().max(120).optional() }),
-    priority: 'normal',
-    durationMs: null,
-    resolve: (input: { file?: string }) => {
-      if (input.file) return mediaExists('videos', input.file) ? { url: mediaUrl('videos', input.file) } : null;
-      // No file chosen (loop entry): rotate through every uploaded video.
-      const files = listMedia('videos');
-      if (!files.length) return null;
-      return { url: mediaUrl('videos', files[videoTurn++ % files.length]!) };
     },
   },
   idle: {

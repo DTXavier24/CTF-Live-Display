@@ -10,7 +10,7 @@ import type { PanelProps } from './Admin';
 interface Field {
   name: string;
   label: string;
-  kind: 'text' | 'textarea' | 'video';
+  kind: 'text' | 'textarea';
   max?: number;
 }
 
@@ -23,7 +23,6 @@ const TEMPLATES: Record<TemplateId, { label: string; manual: boolean; fields?: F
       { name: 'body', label: 'Body (optional)', kind: 'textarea', max: 400 },
     ],
   },
-  'sponsor-video': { label: 'Sponsor video', manual: true, fields: [{ name: 'file', label: 'Video', kind: 'video' }] },
   top10: { label: 'Top 10 scoreboard', manual: true },
   unsolved: { label: 'Unsolved challenges', manual: true },
   spotlight: { label: 'Team spotlight', manual: true },
@@ -44,7 +43,6 @@ const label = (t: TemplateId) => TEMPLATES[t]?.label ?? t;
 function describe(template: TemplateId, input: unknown): string {
   const i = (input ?? {}) as Record<string, unknown>;
   if (template === 'announcement') return String(i.title ?? '');
-  if (template === 'sponsor-video') return String(i.file ?? 'next in rotation');
   if (template === 'blood') return `${i.team} · ${i.challenge} (${i.division})`;
   if (template === 'takeover') return `${(i.leader as { name?: string })?.name} takes #1 (${i.division})`;
   if (template === 'wall-falls') return `${i.challenge} by ${i.team}`;
@@ -265,13 +263,6 @@ export function AddFromTemplate({ state, run }: PanelProps) {
               </span>
               {f.kind === 'textarea' ? (
                 <textarea className="input min-h-24" maxLength={f.max} value={input[f.name] ?? ''} onChange={(e) => setInput({ ...input, [f.name]: e.target.value })} />
-              ) : f.kind === 'video' ? (
-                <select className="input" value={input[f.name] ?? ''} onChange={(e) => setInput({ ...input, [f.name]: e.target.value })}>
-                  <option value="">Next in rotation</option>
-                  {state.media.videos.map((v) => (
-                    <option key={v}>{v}</option>
-                  ))}
-                </select>
               ) : (
                 <input className="input" maxLength={f.max} value={input[f.name] ?? ''} onChange={(e) => setInput({ ...input, [f.name]: e.target.value })} />
               )}
@@ -318,10 +309,6 @@ function TemplatePreview({ template, input, state }: { template: TemplateId; inp
   if (template === 'countdown-end' && state.game) payload = { target: state.game.end, label: 'Time remaining' };
   if (template === 'countdown-start' && state.game) payload = { target: state.game.start, label: 'CTF starts in' };
   if (template === 'idle') payload = {};
-  if (template === 'sponsor-video') {
-    const file = input.file || state.media.videos[0];
-    payload = file ? { url: `/media/videos/${encodeURIComponent(file)}` } : null;
-  }
   const entry = templateComponents[template];
   const item = { id: 'preview', template, payload, durationMs: 15_000, status: 'playing', startedAt: serverNow(), source: 'queue' } as NowPlaying;
   const noop = () => {};
@@ -336,7 +323,7 @@ function TemplatePreview({ template, input, state }: { template: TemplateId; inp
           </div>
         ) : (
           <p className="flex h-full items-center justify-center p-6 text-center text-sm text-fg-muted">
-            {template === 'sponsor-video' ? 'Upload a video first.' : 'Built from live data at the moment it plays.'}
+            Built from live data at the moment it plays.
           </p>
         )}
       </div>
@@ -392,14 +379,6 @@ export function LoopEditor({ state, run }: PanelProps) {
                 </option>
               ))}
             </select>
-            {e.template === 'sponsor-video' && (
-              <select aria-label="Video" className="input w-40" value={(e.input as { file?: string })?.file ?? ''} onChange={(ev) => setEntry(i, { input: ev.target.value ? { file: ev.target.value } : undefined })}>
-                <option value="">Rotate</option>
-                {state.media.videos.map((v) => (
-                  <option key={v}>{v}</option>
-                ))}
-              </select>
-            )}
             <input aria-label="Duration in seconds" className="input w-20" type="number" min={1} placeholder="auto" value={seconds(e.durationMs)} onChange={(ev) => setEntry(i, { durationMs: ev.target.value ? Number(ev.target.value) * 1000 : undefined })} />
             <span className="text-xs text-fg-muted">s</span>
             <button className="btn btn-ghost px-2" aria-label="Remove" onClick={() => edit({ entries: loop.entries.filter((_, j) => j !== i) })}>
@@ -521,7 +500,7 @@ export function FinalStretchCard({ state, run }: PanelProps) {
   const names = { auto: 'Auto', on: 'On now', off: 'Off' } as const;
   return (
     <Card
-      title="Final stretch"
+      title="Opening & final stretch"
       actions={
         draft && (
           <button className="btn btn-primary" onClick={() => run(() => api('PUT', '/api/admin/settings', { finalStretch: draft }), 'Final stretch saved').then((ok) => ok && setDraft(null))}>
@@ -548,6 +527,9 @@ export function FinalStretchCard({ state, run }: PanelProps) {
           </div>
           <p className="mt-1 text-xs text-fg-muted">Alert colors, top 3 per division in place of live stats, bigger timer, faster ticker.</p>
         </div>
+        <Toggle checked={f.openingCountdown} onChange={(openingCountdown) => set({ openingCountdown })}>
+          Opening: full-screen 10-second countdown into the start, then the "Let the battle begin" sequence
+        </Toggle>
         <Toggle checked={f.finalCountdown} onChange={(finalCountdown) => set({ finalCountdown })}>
           Full-screen 10-second countdown at the end (interrupts whatever is playing)
         </Toggle>
@@ -584,15 +566,12 @@ export function Venue({ state, run }: PanelProps) {
 export function MediaLibrary({ state, run }: PanelProps) {
   return (
     <Card title="Media">
-      <div className="grid gap-5 md:grid-cols-2">
-        <MediaList kind="videos" title="Sponsor videos" accept="video/mp4,video/webm" hint="MP4 or WebM, up to 500 MB. Played muted." files={state.media.videos} run={run} />
-        <MediaList kind="logos" title="Sponsor logos (ticker)" accept="image/png,image/jpeg,image/webp,image/gif" hint="PNG, JPG, WebP or GIF, up to 5 MB." files={state.media.logos} run={run} />
-      </div>
+      <MediaList kind="logos" title="Sponsor logos (ticker)" accept="image/png,image/jpeg,image/webp,image/gif" hint="PNG, JPG, WebP or GIF, up to 5 MB." files={state.media.logos} run={run} />
     </Card>
   );
 }
 
-function MediaList({ kind, title, accept, hint, files, run }: { kind: 'videos' | 'logos'; title: string; accept: string; hint: string; files: string[]; run: PanelProps['run'] }) {
+function MediaList({ kind, title, accept, hint, files, run }: { kind: 'logos'; title: string; accept: string; hint: string; files: string[]; run: PanelProps['run'] }) {
   const [progress, setProgress] = useState<{ name: string; fraction: number } | null>(null);
   async function onFiles(list: FileList | null) {
     for (const file of Array.from(list ?? [])) {

@@ -7,7 +7,7 @@ import { kv } from './db.js';
 import { templateIds, templates, type TemplateContext } from './templates.js';
 
 const LOAD_TIMEOUT_MS = 5000;
-/** Cap for items that play until the display says done (videos). */
+/** Cap for items that play until the display says done. */
 const MAX_UNTIMED_MS = 10 * 60_000;
 const IDLE_RETRY_MS = 5000;
 
@@ -15,10 +15,9 @@ const DEFAULT_LOOP: LoopConfig = {
   enabled: true,
   entries: [
     { template: 'top10' },
-    { template: 'sponsor-video' },
     { template: 'unsolved' },
     { template: 'spotlight' },
-    { template: 'sponsor-video' },
+    { template: 'idle' },
     { template: 'countdown-end' },
   ],
 };
@@ -56,8 +55,11 @@ interface EngineDeps {
 }
 
 export function startEngine({ io, log, context, onChange }: EngineDeps) {
-  let queue = kv.get<QueueItem[]>('queue') ?? [];
+  // Saved state can name a template that no longer exists (e.g. the removed sponsor video): drop it.
+  const known = (t: string) => t in templates;
+  let queue = (kv.get<QueueItem[]>('queue') ?? []).filter((q) => known(q.template));
   let loop = kv.get<LoopConfig & { index: number }>('loop') ?? { ...DEFAULT_LOOP, index: 0 };
+  loop = { ...loop, entries: loop.entries.filter((e) => known(e.template)), index: 0 };
   // A queue item cut off by a restart plays again first.
   const interrupted = kv.get<QueueItem | null>('current');
   if (interrupted) queue.unshift(interrupted);

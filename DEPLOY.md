@@ -85,7 +85,7 @@ From the repo on any PC (PowerShell):
 $env:MOCK_START_OFFSET_MIN = -2; $env:MOCK_DURATION_MIN = 6; npm run dev:mock
 ```
 
-That's a full show in ~8 minutes: pre-CTF countdown, opening rush, live loop, then (after setting
+That's a full show in ~8 minutes: pre-CTF countdown, the 10-second countdown and "Let the battle begin" opening, live loop, then (after setting
 *Final stretch → Auto starts before the end* to 1 min in `/admin`) the final hour, the 10-second
 countdown and the ended page. The *Rehearsal* buttons in `/admin` trigger every auto-event on demand,
 and *Extend end +5 min* rehearses a cancelled countdown.
@@ -93,6 +93,6 @@ and *Extend end +5 min* rehearses a cancelled countdown.
 ## Event-day checklist
 
 - [ ] `/admin` → Health: hub **Connected**, scoreboard poll a few seconds ago, 1 display visible
-- [ ] Phase shows **Auto**; venue set; sponsor videos and logos uploaded and previewed
-- [ ] Default loop and auto-event settings reviewed; Final stretch on Auto (60 min) with the countdown on
+- [ ] Phase shows **Auto**; venue set; sponsor logos uploaded and previewed
+- [ ] Default loop and auto-event settings reviewed; Final stretch on Auto (60 min) with the opening and final countdowns on
 - [ ] Laptop: on mains power, sleep disabled, Chrome in kiosk on the hall screen

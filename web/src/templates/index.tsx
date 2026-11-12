@@ -19,8 +19,6 @@ interface TemplateEntry {
   component: FC<TemplateProps<any>>;
   /** Takes over the whole stage instead of the center panel. */
   fullscreen?: boolean;
-  /** Reports ready itself (after media loads) instead of on mount. */
-  waitsForMedia?: boolean;
 }
 
 function Countdown({ item }: TemplateProps<'countdown-start' | 'countdown-end'>) {
@@ -118,22 +116,6 @@ function Idle() {
   );
 }
 
-function SponsorVideo({ item, ready, done, fail }: TemplateProps<'sponsor-video'>) {
-  const { url } = item.payload as TemplatePayloads['sponsor-video'];
-  return (
-    <video
-      src={url}
-      muted
-      autoPlay
-      playsInline
-      preload="auto"
-      onCanPlay={ready}
-      onEnded={done}
-      onError={() => fail(`video failed to load: ${url}`)}
-      className="h-full w-full bg-black object-contain"
-    />
-  );
-}
 
 export const templateComponents: Record<TemplateId, TemplateEntry> = {
   'countdown-start': { component: Countdown },
@@ -141,7 +123,6 @@ export const templateComponents: Record<TemplateId, TemplateEntry> = {
   announcement: { component: Announcement, fullscreen: true },
   top10: { component: Top10 },
   unsolved: { component: Unsolved },
-  'sponsor-video': { component: SponsorVideo, waitsForMedia: true },
   idle: { component: Idle },
   blood: { component: Blood },
   takeover: { component: Takeover },

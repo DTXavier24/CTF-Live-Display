@@ -51,7 +51,7 @@ interface Deps {
   recentErrors: LogEntry[];
 }
 
-const Kind = z.enum(['videos', 'logos']);
+const Kind = z.enum(['logos']);
 
 export async function registerAdmin(app: FastifyInstance, { engine, state, detectors, source, mock, recentErrors }: Deps) {
   app.post('/api/admin/login', async (req, reply) => {
@@ -102,7 +102,7 @@ export async function registerAdmin(app: FastifyInstance, { engine, state, detec
         venue: settings.venue,
         finalStretch: settings.finalStretch,
         finalHour: state.mode().finalHour,
-        media: { videos: listMedia('videos'), logos: listMedia('logos') },
+        media: { logos: listMedia('logos') },
         health: {
           source: mock ? 'mock' : 'gzctf',
           hub: source.hubState?.() ?? 'n/a',
@@ -166,6 +166,7 @@ export async function registerAdmin(app: FastifyInstance, { engine, state, detec
               finalHour: z.enum(['auto', 'on', 'off']),
               finalHourMin: z.number().min(1).max(600),
               finalCountdown: z.boolean(),
+              openingCountdown: z.boolean(),
               endedTop10: z.boolean(),
             })
             .optional(),
@@ -181,7 +182,7 @@ export async function registerAdmin(app: FastifyInstance, { engine, state, detec
     admin.put<{ Params: { kind: string; name: string } }>('/api/admin/media/:kind/:name', async (req, reply) => {
       const kind = Kind.safeParse(req.params.kind);
       if (!kind.success || !validName(kind.data, req.params.name)) {
-        return reply.code(400).send({ error: 'Use a plain file name with a supported extension (videos: mp4, webm; logos: png, jpg, webp, gif).' });
+        return reply.code(400).send({ error: 'Use a plain file name with a supported extension (png, jpg, webp, gif).' });
       }
       try {
         const bytes = await saveMedia(kind.data as MediaKind, req.params.name, req.body as Readable);

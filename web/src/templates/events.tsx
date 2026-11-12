@@ -136,8 +136,8 @@ export function WallFalls({ item }: TemplateProps<'wall-falls'>) {
     <div className="relative h-full overflow-hidden">
       <div className="flex h-full flex-col justify-center px-6">
         <span className="plate plate-red self-start text-[64px]">The wall falls</span>
-        <p className="mt-8 font-display text-7xl font-bold">{p.challenge}</p>
-        <p className="mt-3 font-display text-4xl text-fg-muted">
+        <p className="mt-8 pr-[300px] font-display text-7xl font-bold">{p.challenge}</p>
+        <p className="mt-3 pr-[300px] font-display text-4xl text-fg-muted">
           Unsolved for <span className="font-bold text-red">{fmtStood(p.stoodMs)}</span> · {p.category}
         </p>
         <p className="glitch hit mt-12 truncate font-display text-[96px] leading-none font-bold text-cyan" style={{ animationDelay: '1.7s' }}>
@@ -147,6 +147,15 @@ export function WallFalls({ item }: TemplateProps<'wall-falls'>) {
           by {p.player || 'unknown player'} · {p.division}
         </p>
       </div>
+      {/* Behind the wall all along: revealed as it breaks. */}
+      <motion.img
+        src="/brand/mascot/hooded.png"
+        alt=""
+        className="absolute top-6 right-4 h-[290px]"
+        initial={{ scale: 0.92, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ delay: 1.3, duration: 0.6, ease: EASE }}
+      />
       {/* The wall: holds, shudders once, then breaks apart to reveal the solver. */}
       <motion.div
         className="absolute inset-0 grid"
@@ -198,13 +207,21 @@ export function OnFire({ item }: TemplateProps<'on-fire'>) {
       <Rise delay={0.8} className="relative mt-4 font-display text-5xl font-semibold text-fg-muted">
         <span className="text-red">{p.count}</span> solves in a row
       </Rise>
-      <div className="relative mt-12 flex flex-wrap gap-3">
+      <div className="relative mt-12 mr-[320px] flex flex-wrap gap-3">
         {p.challenges.map((c, i) => (
           <Rise key={c} delay={1 + i * 0.12}>
             <span className="bg-bg/80 px-5 py-2.5 font-display text-3xl font-semibold shadow-[inset_0_0_0_2px_var(--color-red)]">{c}</span>
           </Rise>
         ))}
       </div>
+      <motion.img
+        src="/brand/mascot/hacking.png"
+        alt=""
+        className="absolute right-0 bottom-0 h-[400px]"
+        initial={{ y: 460 }}
+        animate={{ y: 0 }}
+        transition={{ delay: 0.6, type: 'spring', stiffness: 110, damping: 16 }}
+      />
     </div>
   );
 }
@@ -260,7 +277,7 @@ export function Spotlight({ item }: TemplateProps<'spotlight'>) {
       <p className="glitch hit mt-10 truncate font-display text-[104px] leading-none font-bold" style={{ animationDelay: '0.45s' }}>
         {p.name}
       </p>
-      <div className="mt-12 grid grid-cols-4 gap-4">
+      <div className="mt-12 mr-[340px] grid grid-cols-2 gap-4">
         {stats.map(([text, value], i) => (
           <Rise key={text} delay={0.8 + i * 0.1} className="bg-bg/80 px-6 py-5">
             <p className="font-display text-lg font-semibold tracking-[0.1em] text-fg-muted uppercase">{text}</p>
@@ -269,11 +286,19 @@ export function Spotlight({ item }: TemplateProps<'spotlight'>) {
         ))}
       </div>
       {p.players.length > 0 && (
-        <Rise delay={1.3} className="mt-10 font-display text-4xl">
+        <Rise delay={1.3} className="mt-10 mr-[340px] font-display text-4xl">
           <span className="text-fg-muted">Players </span>
           {p.players.join('  ·  ')}
         </Rise>
       )}
+      <motion.img
+        src="/brand/mascot/peek.png"
+        alt=""
+        className="absolute right-0 bottom-6 h-[420px]"
+        initial={{ x: 320 }}
+        animate={{ x: 0 }}
+        transition={{ delay: 0.9, type: 'spring', stiffness: 90, damping: 15 }}
+      />
     </div>
   );
 }

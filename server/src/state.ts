@@ -28,7 +28,7 @@ function buildId() {
 }
 
 /** Admin settings that the display reads. */
-const FINAL_DEFAULTS: FinalStretch = { finalHour: 'auto', finalHourMin: 60, finalCountdown: true, endedTop10: true };
+const FINAL_DEFAULTS: FinalStretch = { finalHour: 'auto', finalHourMin: 60, finalCountdown: true, openingCountdown: true, endedTop10: true };
 export const settings = {
   phaseOverride: kv.get<PhaseOverride>('phaseOverride') ?? 'auto',
   venue: kv.get<string>('venue') ?? 'the main hall',
@@ -45,13 +45,17 @@ export function saveSettings(next: Partial<typeof settings>) {
 export function modeAt(game: Game | null, now: number) {
   const phase = phaseAt(game, now);
   const left = game ? game.end - now : Infinity;
+  const toStart = game ? game.start - now : Infinity;
   const f = settings.finalStretch;
   const live = phase === 'live';
+  const auto = settings.phaseOverride === 'auto';
   return {
     phase,
     finalHour: live && f.finalHour !== 'off' && (f.finalHour === 'on' || (left > 0 && left <= f.finalHourMin * 60_000)),
     // Only on the real clock: a manual phase override never triggers the end-of-game sequence.
-    countdown: live && f.finalCountdown && settings.phaseOverride === 'auto' && left > 0 && left <= COUNTDOWN_MS,
+    countdown: live && f.finalCountdown && auto && left > 0 && left <= COUNTDOWN_MS,
+    // The mirror at the start: 10 -> 0 into the opening sequence.
+    startCountdown: phase === 'pre' && f.openingCountdown && auto && toStart > 0 && toStart <= COUNTDOWN_MS,
   };
 }
 export type Mode = ReturnType<typeof modeAt>;
@@ -110,6 +114,7 @@ export function startState(
       logos: listMedia('logos').map((f) => mediaUrl('logos', f)),
       finalHour: mode.finalHour,
       finalCountdown: settings.finalStretch.finalCountdown && settings.phaseOverride === 'auto',
+      openingCountdown: settings.finalStretch.openingCountdown && settings.phaseOverride === 'auto',
       endedTop10: settings.finalStretch.endedTop10,
     };
   }
@@ -182,11 +187,12 @@ export function startState(
     push();
   }
 
-  // Poll on a chain so the interval can tighten near the end of the game.
+  // Poll on a chain so the interval can tighten near the start and the end of the game.
   async function pollLoop() {
     await poll();
-    const left = game ? game.end - Date.now() : Infinity;
-    const near = phaseAt(game, Date.now()) === 'live' && left < FAST_POLL_WINDOW_MS && left > -5000;
+    const now = Date.now();
+    const close = (t: number | undefined) => t !== undefined && t - now < FAST_POLL_WINDOW_MS && t - now > -5000;
+    const near = close(game?.start) || (phaseAt(game, now) === 'live' && close(game?.end));
     setTimeout(pollLoop, near ? FAST_POLL_MS : POLL_MS);
   }
   void pollLoop();
@@ -209,7 +215,7 @@ export function startState(
     health: () => ({ lastFetchOk, lastFetchError }),
     context: (): TemplateContext => {
       const mode = modeAt(game, Date.now());
-      return { game, scoreboard, phase: mode.phase, paused: mode.countdown, now: Date.now(), solves: detectors.solves() };
+      return { game, scoreboard, phase: mode.phase, paused: mode.countdown || mode.startCountdown, now: Date.now(), solves: detectors.solves() };
     },
     mode: () => modeAt(game, Date.now()),
     onModeChange(cb: (mode: Mode) => void) {

@@ -34,7 +34,6 @@ const app = Fastify({
 const io = new Server<ClientToServerEvents, ServerToClientEvents>(app.server);
 
 // Uploaded media. Served in dev too; Vite proxies /media here.
-await app.register(fastifyStatic, { root: MEDIA.videos.dir, prefix: '/media/videos/', decorateReply: false });
 await app.register(fastifyStatic, { root: MEDIA.logos.dir, prefix: '/media/logos/', decorateReply: false });
 
 // Production: serve the built frontend. In dev, Vite serves it and proxies /socket.io here.
@@ -64,7 +63,7 @@ const detectors = createDetectors({
 const state = startState(source, io, app.log, detectors);
 engine = startEngine({ io, log: app.log, context: state.context, onChange: state.push });
 state.setNowPlaying(engine.now);
-state.onModeChange((mode) => engine?.setPaused(mode.countdown));
+state.onModeChange((mode) => engine?.setPaused(mode.countdown || mode.startCountdown));
 
 await registerAdmin(app, { engine, state, detectors, source, mock, recentErrors });
 

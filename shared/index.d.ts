@@ -82,6 +82,8 @@ export interface DisplayState {
   finalHour: boolean;
   /** Whether the 10-second countdown runs at the end (the display times it against the server clock). */
   finalCountdown: boolean;
+  /** Whether a 10-second countdown runs into the start, followed by the opening sequence. */
+  openingCountdown: boolean;
   /** Ended page also alternates the final Top 10 of each division. */
   endedTop10: boolean;
 }
@@ -91,6 +93,7 @@ export interface FinalStretch {
   /** Auto mode turns final hour on this many minutes before the end. */
   finalHourMin: number;
   finalCountdown: boolean;
+  openingCountdown: boolean;
   endedTop10: boolean;
 }
 
@@ -126,7 +129,6 @@ export interface TemplatePayloads {
   announcement: { title: string; body: string };
   top10: { boards: Top10Board[] };
   unsolved: { categories: { category: string; challenges: string[] }[]; total: number };
-  'sponsor-video': { url: string };
   idle: Record<string, never>;
   blood: { rank: 1 | 2 | 3; division: Division; team: string; player: string; challenge: string; category: string; time: number };
   takeover: { division: Division; leader: { name: string; score: number }; dethroned: { name: string; score: number }; gap: number };
@@ -234,7 +236,7 @@ export interface AdminState {
   venue: string;
   finalStretch: FinalStretch;
   finalHour: boolean;
-  media: { videos: string[]; logos: string[] };
+  media: { logos: string[] };
   health: {
     source: 'mock' | 'gzctf';
     /** SignalR hub state, or 'n/a' in mock mode. */

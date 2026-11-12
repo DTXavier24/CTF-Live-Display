@@ -27,7 +27,7 @@ function errorText(data: { error?: unknown }): string {
 }
 
 /** Upload a file as the raw request body, reporting progress (fetch can't report upload progress). */
-export function upload(kind: 'videos' | 'logos', file: File, onProgress: (fraction: number) => void): Promise<void> {
+export function upload(kind: 'logos', file: File, onProgress: (fraction: number) => void): Promise<void> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('PUT', `/api/admin/media/${kind}/${encodeURIComponent(file.name)}`);

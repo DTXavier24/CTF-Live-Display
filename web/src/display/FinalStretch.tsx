@@ -1,4 +1,5 @@
-// The end of the game: final hour mode, the 10-second countdown, and the final standings.
+// The edges of the game: the 10-second countdowns (into the start and into the end), final hour
+// mode, and the final standings.
 import type { DisplayState, Division, ScoreEntry } from '@iboh/shared';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
@@ -6,28 +7,38 @@ import { fmtClock, serverNow } from '../server';
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 const COUNTDOWN_MS = 10_000;
-/** The "0" holds this long past the end, landing under the white burn, before the overlay leaves. */
+/** The "0" holds this long past the target, landing under the white burn, before the overlay leaves. */
 const ZERO_HOLD_MS = 700;
 
 /**
- * True from the exact end time, timed in the browser against the server clock. The server's own
- * phase push can trail by a poll tick; the countdown has to land on 0 exactly, then cut to ended.
+ * True from the exact target time (start or end), timed in the browser against the server clock.
+ * The server's own phase push can trail by a poll tick; a countdown has to land on 0 exactly.
  */
-export function usePastEnd(end: number | undefined, enabled: boolean) {
+export function usePast(target: number | undefined, enabled: boolean) {
   const [past, setPast] = useState(false);
   useEffect(() => {
     setPast(false);
-    if (!enabled || !end) return;
-    const left = end - serverNow();
+    if (!enabled || !target) return;
+    const left = target - serverNow();
     if (left <= 0) return setPast(true);
     const t = setTimeout(() => setPast(true), left);
     return () => clearTimeout(t);
-  }, [end, enabled]);
+  }, [target, enabled]);
   return past;
 }
 
-/** Full-screen 10 → 0. Mounted for the whole live phase; shows itself only in the last 10 seconds. */
-export function FinalCountdown({ end }: { end: number }) {
+const TONES = {
+  red: { plate: 'plate-red', ring: 'border-red', zero: 'text-red', stripes: 'text-red' },
+  cyan: { plate: 'plate-cyan', ring: 'border-cyan', zero: 'text-cyan', stripes: 'text-cyan' },
+} as const;
+
+/**
+ * Full-screen 10 → 0 to `target`. Stays mounted; shows itself only in the last 10 seconds, so a
+ * target that moves (an extension, a delayed start) cancels it cleanly.
+ */
+export function BigCountdown({ target, label, tone }: { target: number; label: string; tone: keyof typeof TONES }) {
+  const end = target;
+  const t = TONES[tone];
   const [left, setLeft] = useState(() => end - serverNow());
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | undefined;
@@ -40,11 +51,11 @@ export function FinalCountdown({ end }: { end: number }) {
     // not stay frozen on screen while we wait for the new last-10-seconds window.
     tick();
     const wait = end - COUNTDOWN_MS - serverNow();
-    const t = setTimeout(start, Math.max(0, wait));
+    const begin = setTimeout(start, Math.max(0, wait));
     // Stop ticking once the zero has had its moment.
     const stop = setTimeout(() => clearInterval(interval), Math.max(0, end + ZERO_HOLD_MS + 500 - serverNow()));
     return () => {
-      clearTimeout(t);
+      clearTimeout(begin);
       clearTimeout(stop);
       clearInterval(interval);
     };
@@ -64,12 +75,12 @@ export function FinalCountdown({ end }: { end: number }) {
           exit={{ opacity: 0, transition: { duration: 0.35, ease: 'easeIn' } }}
           transition={{ duration: 0.5, ease: EASE }}
         >
-          <div className="stripes text-red" />
-          <span className="plate plate-red relative text-6xl">IBOH 2026 ends in</span>
+          <div className={`stripes ${t.stripes}`} />
+          <span className={`plate ${t.plate} relative text-6xl`}>{label}</span>
           <AnimatePresence mode="popLayout">
             <motion.span
               key={n}
-              className={`glitch relative font-display leading-none font-bold tabular-nums ${n === 0 ? 'text-red' : 'text-fg'}`}
+              className={`glitch relative font-display leading-none font-bold tabular-nums ${n === 0 ? t.zero : 'text-fg'}`}
               style={{ fontSize: 560 }}
               initial={{ scale: 1.6, opacity: 0, filter: 'blur(24px)' }}
               animate={{ scale: 1, opacity: 1, filter: 'blur(0px)' }}
@@ -83,7 +94,7 @@ export function FinalCountdown({ end }: { end: number }) {
           <motion.span
             key={`ring-${n}`}
             aria-hidden
-            className="absolute h-[620px] w-[620px] rounded-full border-[6px] border-red"
+            className={`absolute h-[620px] w-[620px] rounded-full border-[6px] ${t.ring}`}
             initial={{ scale: 0.6, opacity: 0.8 }}
             animate={{ scale: 1.8, opacity: 0 }}
             transition={{ duration: 0.95, ease: EASE }}
@@ -116,7 +127,11 @@ export function FinalHourIntro({ on, end }: { on: boolean; end: number | undefin
       setShow(true);
       const t = setTimeout(() => setShow(false), 3600);
       prev.current = on;
-      return () => clearTimeout(t);
+      // If the mode flips again mid-intro, end the intro rather than leave it up for good.
+      return () => {
+        clearTimeout(t);
+        setShow(false);
+      };
     }
     prev.current = on;
   }, [on]);
@@ -138,6 +153,15 @@ export function FinalHourIntro({ on, end }: { on: boolean; end: number | undefin
           <p className="glitch hit relative font-display text-[260px] leading-none font-bold uppercase" style={{ animationDelay: '0.6s' }}>
             Final hour
           </p>
+          {/* "I'm fine": the mascot after nine hours of hacking. */}
+          <motion.img
+            src="/brand/mascot/tired.png"
+            alt=""
+            className="absolute right-16 bottom-10 h-[360px]"
+            initial={{ y: 420, rotate: 6 }}
+            animate={{ y: 0, rotate: 0 }}
+            transition={{ delay: 1.1, type: 'spring', stiffness: 110, damping: 15 }}
+          />
         </motion.div>
       )}
     </AnimatePresence>

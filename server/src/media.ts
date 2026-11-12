@@ -1,15 +1,14 @@
-// Uploaded media: sponsor videos (played by the sponsor-video template) and sponsor logos (ticker).
+// Uploaded media: sponsor logos for the ticker.
 import { createWriteStream, mkdirSync, readdirSync, renameSync, rmSync, existsSync } from 'node:fs';
 import { pipeline } from 'node:stream/promises';
 import { Transform, type Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 
-export type MediaKind = 'videos' | 'logos';
+export type MediaKind = 'logos';
 
 const ROOT = fileURLToPath(new URL('../../data/media/', import.meta.url));
 
 export const MEDIA: Record<MediaKind, { dir: string; ext: RegExp; maxBytes: number }> = {
-  videos: { dir: ROOT + 'videos/', ext: /\.(mp4|webm)$/i, maxBytes: 500 * 1024 * 1024 },
   // No SVG: served from our own origin it could run script against the admin session.
   logos: { dir: ROOT + 'logos/', ext: /\.(png|jpe?g|webp|gif)$/i, maxBytes: 5 * 1024 * 1024 },
 };

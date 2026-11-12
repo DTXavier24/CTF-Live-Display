@@ -5,7 +5,8 @@ import { Boundary } from '../Boundary';
 import { CountUp, Mono } from '../CountUp';
 import { ordinal } from '../templates/events';
 import { Featured, isFullscreen, Wipe } from './Featured';
-import { EndFlash, FinalCountdown, FinalHourIntro, FinalStandings, Top3Panel, usePastEnd } from './FinalStretch';
+import { BigCountdown, EndFlash, FinalHourIntro, FinalStandings, Top3Panel, usePast } from './FinalStretch';
+import { GameOn, useOpening } from './Opening';
 import { Stage } from '../Stage';
 import { fmtClock, fmtDuration, useNow, useServerState } from '../server';
 
@@ -13,8 +14,11 @@ export function Display() {
   const { state, connected } = useServerState();
   const delayed = !state || !connected || state.dataDelayed;
   // With the countdown on, cut to ended at the exact end time instead of waiting for the server push.
-  const pastEnd = usePastEnd(state?.game?.end, !!state && state.phase === 'live' && state.finalCountdown);
-  const phase = pastEnd ? 'ended' : state?.phase;
+  const pastEnd = usePast(state?.game?.end, !!state && state.phase === 'live' && state.finalCountdown);
+  // Same at the start: cut to live on the exact start time, under the opening sequence.
+  const pastStart = usePast(state?.game?.start, !!state && state.phase === 'pre' && state.openingCountdown);
+  const phase = pastEnd ? 'ended' : pastStart && state?.phase === 'pre' ? 'live' : state?.phase;
+  const opening = useOpening(phase);
   const finalHour = !!state?.finalHour && phase === 'live';
 
   // The hit at zero: one white burn over the cut into the closing statement.
@@ -50,7 +54,9 @@ export function Display() {
           {state && phase !== 'ended' && <Overlay state={state} />}
           {state && delayed && <DelayedBadge />}
           <FinalHourIntro on={finalHour} end={state?.game?.end} />
-          {state?.game && state.finalCountdown && <FinalCountdown end={state.game.end} />}
+          {state?.game && state.openingCountdown && <BigCountdown target={state.game.start} label="IBOH 2026 begins in" tone="cyan" />}
+          {state?.game && state.finalCountdown && <BigCountdown target={state.game.end} label="IBOH 2026 ends in" tone="red" />}
+          <GameOn show={opening} />
           {flash && <EndFlash />}
           <div className="scanlines" aria-hidden />
         </div>
@@ -100,10 +106,18 @@ function PreView({ state }: { state: DisplayState }) {
   return (
     <div className="grid h-full grid-rows-[1fr_96px]">
       <div className="flex items-center justify-center gap-24 px-24">
-        <img src="/brand/mascot.png" alt="" className="max-h-[640px] max-w-[560px] object-contain" />
+        {/* The mascot stands on a slowly turning HUD: the animated SVG breathes, blinks and flaps. */}
+        <div className="relative flex h-[640px] w-[600px] shrink-0 items-center justify-center">
+          <div aria-hidden className="absolute h-[600px] w-[600px] rounded-full" style={{ background: 'radial-gradient(circle, rgba(72,224,224,0.16), transparent 65%)' }} />
+          <div aria-hidden className="hud-ring absolute h-[560px] w-[560px] rounded-full border-2 border-dashed border-cyan/40" />
+          <div aria-hidden className="hud-ring-rev absolute h-[470px] w-[470px] rounded-full border-[3px] border-red/30" style={{ borderStyle: 'dotted' }} />
+          <img src="/brand/mascot/idle.svg" alt="" className="relative h-[600px] w-[600px] object-contain" />
+        </div>
         <div className="flex flex-col items-start">
           <img src="/brand/logo_with_text.png" alt="" className="max-h-[200px]" />
-          <p className="mt-10 font-display text-3xl font-semibold text-cyan">14 November 2026 · GMT+8</p>
+          <p className="mt-10 font-display text-3xl font-semibold text-cyan">
+            14 November 2026 · {state.game ? `Flags open ${fmtClock(state.game.start).slice(0, 5)} GMT+8` : 'GMT+8'}
+          </p>
           <div className="mt-10">
             <span className="plate plate-cyan text-2xl">CTF starts in</span>
             <p className="glitch font-display text-[180px] leading-none font-bold">
@@ -136,6 +150,15 @@ function EndedView({ state }: { state: DisplayState }) {
           <FinalStandings entries={state.scoreboard.entries} />
         </motion.div>
       )}
+      {/* The mascot waves everyone off to the venue. */}
+      <motion.img
+        src="/brand/mascot/wave.png"
+        alt=""
+        className={`absolute right-10 bottom-0 ${standings ? 'h-[230px]' : 'h-[400px]'}`}
+        initial={{ y: 420 }}
+        animate={{ y: 0 }}
+        transition={{ delay: 1.8, type: 'spring', stiffness: 110, damping: 16 }}
+      />
     </div>
   );
 }

@@ -187,6 +187,17 @@ body {
     from { background-color: rgba(240, 92, 85, 0.6); }
   }
   
+  /* Pre-CTF HUD rings behind the mascot: very slow, opposite directions. */
+  .hud-ring {
+    animation: spin 60s linear infinite;
+  }
+  .hud-ring-rev {
+    animation: spin 42s linear infinite reverse;
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
   /* Live indicator: a slow ring, not a blink. */
   .live-dot {
     position: relative;
@@ -209,6 +220,8 @@ body {
     .scanlines::after,
     .stripes,
     .live-dot::after,
+    .hud-ring,
+    .hud-ring-rev,
     .ticker {
       animation: none;
     }

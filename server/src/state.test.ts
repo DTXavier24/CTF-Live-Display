@@ -8,7 +8,7 @@ const MIN = 60_000;
 const end = 1_000_000_000_000;
 const game = { title: 'g', start: end - 600 * MIN, end };
 const at = (msBeforeEnd: number) => modeAt(game, end - msBeforeEnd);
-const stretch = { finalHour: 'auto' as const, finalHourMin: 60, finalCountdown: true, endedTop10: true };
+const stretch = { finalHour: 'auto' as const, finalHourMin: 60, finalCountdown: true, openingCountdown: true, endedTop10: true };
 
 test('final hour: auto turns on at the configured minutes before the end', () => {
   saveSettings({ phaseOverride: 'auto', finalStretch: stretch });
@@ -39,6 +39,22 @@ test('countdown: exactly the last 10 seconds, only on the real clock, only when 
   assert.equal(at(5000).countdown, false);
   saveSettings({ phaseOverride: 'auto', finalStretch: { ...stretch, finalCountdown: false } });
   assert.equal(at(5000).countdown, false);
+});
+
+test('opening countdown: the last 10 seconds before the start, only on the real clock, only when enabled', () => {
+  saveSettings({ phaseOverride: 'auto', finalStretch: stretch });
+  const start = game.start;
+  const before = (ms: number) => modeAt(game, start - ms);
+  assert.equal(before(10_001).startCountdown, false);
+  assert.equal(before(10_000).startCountdown, true);
+  assert.equal(before(1).startCountdown, true);
+  assert.equal(before(0).startCountdown, false);
+  assert.equal(before(0).phase, 'live');
+  saveSettings({ finalStretch: { ...stretch, openingCountdown: false } });
+  assert.equal(before(5000).startCountdown, false);
+  saveSettings({ phaseOverride: 'pre', finalStretch: stretch });
+  assert.equal(before(5000).startCountdown, false);
+  saveSettings({ phaseOverride: 'auto' });
 });
 
 test('an extended end time cancels the countdown', () => {
